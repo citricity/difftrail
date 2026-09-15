@@ -16,19 +16,43 @@
  * even in a repository with a very large change set.
  */
 
-import type { DocumentFile } from '../types/index.ts';
+import type { DiffHunk, DocumentFile, LineRange } from '../types/index.ts';
+import { splitGap } from './ranges.ts';
+import { wrapCount } from './wrap.ts';
 
-export type NoticeKind =
-  | 'binary'
-  | 'truncated'
-  | 'empty'
-  | 'error'
-  | 'collapsed';
+export type NoticeKind = 'binary' | 'truncated' | 'empty' | 'error' | 'collapsed';
 
 export type DocumentRow =
   | { kind: 'file-header'; fileId: string }
   | { kind: 'hunk-header'; fileId: string; hunkId: string }
-  | { kind: 'line'; fileId: string; hunkId: string; lineIndex: number }
+  /** `rows` is how many visual lines it occupies once wrapped; 1 when not. */
+  | {
+      kind: 'line';
+      fileId: string;
+      hunkId: string;
+      lineIndex: number;
+      rows: number;
+    }
+  /**
+   * Lines a hunk left out, still hidden. `above` and `below` say whether the
+   * file continues on that side, which is what decides which way the reader
+   * can expand.
+   */
+  | {
+      kind: 'expander';
+      fileId: string;
+      range: LineRange;
+      above: boolean;
+      below: boolean;
+    }
+  /** A line of unchanged context the reader expanded into view. */
+  | {
+      kind: 'context';
+      fileId: string;
+      lineNumber: number;
+      oldLineNumber: number;
+      rows: number;
+    }
   | { kind: 'notice'; fileId: string; notice: NoticeKind }
   | { kind: 'placeholder'; fileId: string }
   | { kind: 'spacer'; fileId: string };
@@ -37,6 +61,7 @@ export interface RowMetrics {
   /** Height of one diff line, in pixels. Measured from the rendered font. */
   lineHeight: number;
   fileHeaderHeight: number;
+  expanderHeight: number;
   noticeHeight: number;
   placeholderHeight: number;
   /** Vertical gap after each file. */
@@ -65,8 +90,12 @@ function heightOf(row: DocumentRow, metrics: RowMetrics): number {
     case 'file-header':
       return metrics.fileHeaderHeight;
     case 'hunk-header':
-    case 'line':
       return metrics.lineHeight;
+    case 'line':
+    case 'context':
+      return metrics.lineHeight * row.rows;
+    case 'expander':
+      return metrics.expanderHeight;
     case 'notice':
       return metrics.noticeHeight;
     case 'placeholder':
@@ -74,6 +103,28 @@ function heightOf(row: DocumentRow, metrics: RowMetrics): number {
     case 'spacer':
       return metrics.fileGap;
   }
+}
+
+/**
+ * The lines a hunk occupies on one side.
+ *
+ * Git writes a zero-length side as `+c,0`, where `c` is the last line *before*
+ * the change rather than the first line of it. Returning an empty span that
+ * starts after `c` keeps the arithmetic below uniform: the gap before the hunk
+ * still ends at `start - 1`, and the gap after it still begins at `end + 1`.
+ */
+function span(start: number, count: number): LineRange {
+  return count === 0
+    ? { start: start + 1, end: start }
+    : { start, end: start + count - 1 };
+}
+
+function newSpan(hunk: DiffHunk): LineRange {
+  return span(hunk.newStart, hunk.newLines);
+}
+
+function oldSpan(hunk: DiffHunk): LineRange {
+  return span(hunk.oldStart, hunk.oldLines);
 }
 
 /** Which notice, if any, stands in for a file's body. */
@@ -87,9 +138,17 @@ function noticeFor(file: DocumentFile): NoticeKind | null {
   return null;
 }
 
+/**
+ * Builds the document's rows.
+ *
+ * `wrapColumn` is the column long lines wrap at, or null to let them scroll
+ * horizontally instead. Wrapping is resolved here rather than in CSS so that
+ * every row's height stays exact arithmetic — see `lib/wrap.ts`.
+ */
 export function buildRowModel(
   files: DocumentFile[],
   metrics: RowMetrics,
+  wrapColumn: number | null = null,
 ): RowModel {
   const rows: DocumentRow[] = [];
   const fileRowIndex = new Map<string, number>();
@@ -113,14 +172,91 @@ export function buildRowModel(
         maxLineLength = file.diff.maxLineLength;
       }
 
-      for (const hunk of file.diff.hunks) {
+      const hunks = file.diff.hunks;
+
+      /**
+       * Expansion needs the working file: gaps are the lines the hunks left
+       * out of it. A file without one — a deletion — has no gaps to begin
+       * with, since its diff covers all of it.
+       */
+      const working = file.text?.working ?? null;
+
+      /**
+       * Emits one gap, as an expander per hidden run and context rows per
+       * revealed one. `delta` converts a working-side line number to its
+       * original-side counterpart, which is constant across a gap because
+       * nothing in it changed.
+       */
+      const emitGap = (gap: LineRange, delta: number): void => {
+        if (working === null) return;
+
+        for (const segment of splitGap(gap, file.revealed)) {
+          if (segment.kind === 'hidden') {
+            rows.push({
+              kind: 'expander',
+              fileId,
+              range: segment.range,
+              above: segment.range.start > 1,
+              below: segment.range.end < working.length,
+            });
+            continue;
+          }
+
+          for (let n = segment.range.start; n <= segment.range.end; n += 1) {
+            const content = working[n - 1] ?? '';
+            if (content.length > maxLineLength) maxLineLength = content.length;
+
+            rows.push({
+              kind: 'context',
+              fileId,
+              lineNumber: n,
+              oldLineNumber: n + delta,
+              rows: wrapCount(content.length, wrapColumn),
+            });
+          }
+        }
+      };
+
+      if (hunks.length > 0) {
+        const first = hunks[0];
+        emitGap(
+          { start: 1, end: newSpan(first).start - 1 },
+          oldSpan(first).start - newSpan(first).start,
+        );
+      }
+
+      hunks.forEach((hunk, index) => {
         hunkRowIndex.set(hunk.id, rows.length);
         rows.push({ kind: 'hunk-header', fileId, hunkId: hunk.id });
 
         for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
-          rows.push({ kind: 'line', fileId, hunkId: hunk.id, lineIndex });
+          rows.push({
+            kind: 'line',
+            fileId,
+            hunkId: hunk.id,
+            lineIndex,
+            rows: wrapCount(hunk.lines[lineIndex].content.length, wrapColumn),
+          });
         }
-      }
+
+        const next = hunks[index + 1];
+        const start = newSpan(hunk).end + 1;
+
+        // A middle gap can be measured from either hunk it sits between and
+        // the answers agree, because the lines in it are unchanged. The one
+        // after the last hunk has only the hunk above to go on.
+        if (next === undefined) {
+          emitGap(
+            { start, end: working?.length ?? 0 },
+            oldSpan(hunk).end - newSpan(hunk).end,
+          );
+        } else {
+          emitGap(
+            { start, end: newSpan(next).start - 1 },
+            oldSpan(next).start - newSpan(next).start,
+          );
+        }
+      });
     }
 
     rows.push({ kind: 'spacer', fileId });
@@ -140,7 +276,13 @@ export function buildRowModel(
     totalHeight: top,
     fileRowIndex,
     hunkRowIndex,
-    contentWidth: metrics.gutterWidth + maxLineLength * metrics.charWidth,
+    // Wrapping caps the horizontal extent at the wrap column — there is
+    // nothing further right to scroll to — but a document of short lines is
+    // narrower still.
+    contentWidth:
+      metrics.gutterWidth +
+      (wrapColumn === null ? maxLineLength : Math.min(maxLineLength, wrapColumn)) *
+        metrics.charWidth,
   };
 }
 
@@ -209,9 +351,7 @@ export function offsetOfTarget(
   hunkId: string | null,
 ): number | null {
   const rowIndex =
-    hunkId === null
-      ? model.fileRowIndex.get(fileId)
-      : model.hunkRowIndex.get(hunkId);
+    hunkId === null ? model.fileRowIndex.get(fileId) : model.hunkRowIndex.get(hunkId);
 
   if (rowIndex === undefined) return null;
   return model.offsets[rowIndex];
@@ -231,6 +371,10 @@ export function rowKey(row: DocumentRow): string {
       return `h:${row.hunkId}`;
     case 'line':
       return `l:${row.hunkId}:${row.lineIndex}`;
+    case 'expander':
+      return `x:${row.fileId}:${row.range.start}`;
+    case 'context':
+      return `c:${row.fileId}:${row.lineNumber}`;
     case 'notice':
       return `n:${row.fileId}:${row.notice}`;
     case 'placeholder':

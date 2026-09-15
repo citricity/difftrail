@@ -30,6 +30,23 @@
   position: relative;
 }
 
+/* Holds the rows that span the full width — file headers, notices,
+   placeholders — so horizontal scrolling does not carry them off the left
+   edge while long lines are being read.
+
+   Sticky on the horizontal axis only: no `top` is set, so it never detaches
+   vertically, and its height is zero so it takes part in flow without
+   displacing anything. The rows inside stay absolutely positioned at their
+   document offsets and scroll vertically as they always did. Its width is set
+   to the viewport's by the component, which is exactly what gives `left: 0`
+   room to shift within the wider canvas. */
+.pinned {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  height: 0;
+}
+
 /* Shows which file the top of the viewport is inside, so a long file never
    leaves the reader without a heading. */
 .stickyFile {

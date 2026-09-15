@@ -16,12 +16,20 @@ import {
   visibleRange,
 } from './rows.ts';
 import type { RowMetrics } from './rows.ts';
-import { loadedFile, makeDiff, makeMeta, pendingFile } from '../test/factories.ts';
+import {
+  loadedFile,
+  makeDiff,
+  makeHunk,
+  makeLine,
+  makeMeta,
+  pendingFile,
+} from '../test/factories.ts';
 import type { DocumentFile } from '../types/index.ts';
 
 const METRICS: RowMetrics = {
   lineHeight: 20,
   fileHeaderHeight: 40,
+  expanderHeight: 24,
   noticeHeight: 50,
   placeholderHeight: 60,
   fileGap: 10,
@@ -49,13 +57,21 @@ describe('buildRowModel', () => {
   it('reduces an unloaded file to a single placeholder row', () => {
     const model = buildRowModel([pendingFile('huge.ts')], METRICS);
 
-    expect(model.rows.map((row) => row.kind)).toEqual(['file-header', 'placeholder', 'spacer']);
+    expect(model.rows.map((row) => row.kind)).toEqual([
+      'file-header',
+      'placeholder',
+      'spacer',
+    ]);
   });
 
   it('reduces a binary, truncated, collapsed or failed file to one notice row', () => {
     const cases: Array<[string, DocumentFile, string]> = [
       ['binary', fileWith('a', { diff: makeDiff('a', 0, { binary: true }) }), 'binary'],
-      ['truncated', fileWith('b', { diff: makeDiff('b', 0, { truncated: true }) }), 'truncated'],
+      [
+        'truncated',
+        fileWith('b', { diff: makeDiff('b', 0, { truncated: true }) }),
+        'truncated',
+      ],
       ['empty', fileWith('c', { diff: makeDiff('c', 0) }), 'empty'],
       ['collapsed', fileWith('d', { collapsed: true }), 'collapsed'],
       ['error', fileWith('e', { status: 'error', diff: null, error: 'boom' }), 'error'],
@@ -74,13 +90,18 @@ describe('buildRowModel', () => {
     const expanded = buildRowModel([loadedFile('a.ts', 3)], METRICS);
     const collapsed = buildRowModel([fileWith('a.ts', { collapsed: true })], METRICS);
 
-    expect(expanded.rows.filter((row) => row.kind === 'line').length).toBeGreaterThan(0);
+    expect(expanded.rows.filter((row) => row.kind === 'line').length).toBeGreaterThan(
+      0,
+    );
     expect(collapsed.rows.filter((row) => row.kind === 'line')).toHaveLength(0);
     expect(collapsed.fileRowIndex.has('a.ts')).toBe(true);
   });
 
   it('computes offsets that match a running total of the row heights', () => {
-    const model = buildRowModel([loadedFile('a.ts', 1), loadedFile('b.ts', 1)], METRICS);
+    const model = buildRowModel(
+      [loadedFile('a.ts', 1), loadedFile('b.ts', 1)],
+      METRICS,
+    );
 
     // header 40 + hunk 20 + line 20 + line 20 + gap 10 = 110 per file.
     expect(model.offsets[0]).toBe(0);
@@ -99,8 +120,12 @@ describe('buildRowModel', () => {
   });
 
   it('sizes the horizontal scroll area from the longest line in the whole diff', () => {
-    const narrow = fileWith('a.ts', { diff: makeDiff('a.ts', 1, { maxLineLength: 10 }) });
-    const wide = fileWith('b.ts', { diff: makeDiff('b.ts', 1, { maxLineLength: 200 }) });
+    const narrow = fileWith('a.ts', {
+      diff: makeDiff('a.ts', 1, { maxLineLength: 10 }),
+    });
+    const wide = fileWith('b.ts', {
+      diff: makeDiff('b.ts', 1, { maxLineLength: 200 }),
+    });
 
     const model = buildRowModel([narrow, wide], METRICS);
 
@@ -166,7 +191,10 @@ describe('visibleRange', () => {
   });
 
   it('is empty for an empty document', () => {
-    expect(visibleRange(buildRowModel([], METRICS), 0, 500, 5)).toEqual({ start: 0, end: 0 });
+    expect(visibleRange(buildRowModel([], METRICS), 0, 500, 5)).toEqual({
+      start: 0,
+      end: 0,
+    });
   });
 });
 
@@ -178,7 +206,9 @@ describe('offsetOfTarget', () => {
   });
 
   it('finds a file when no hunk is named', () => {
-    expect(offsetOfTarget(model, 'b.ts', null)).toBe(model.offsets[model.fileRowIndex.get('b.ts')!]);
+    expect(offsetOfTarget(model, 'b.ts', null)).toBe(
+      model.offsets[model.fileRowIndex.get('b.ts')!],
+    );
   });
 
   it('returns null for a hunk that is not loaded yet, so the caller can wait', () => {
@@ -188,7 +218,10 @@ describe('offsetOfTarget', () => {
 
 describe('fileAtOffset', () => {
   it('names the file the viewport is inside', () => {
-    const model = buildRowModel([loadedFile('a.ts', 1), loadedFile('b.ts', 1)], METRICS);
+    const model = buildRowModel(
+      [loadedFile('a.ts', 1), loadedFile('b.ts', 1)],
+      METRICS,
+    );
 
     expect(fileAtOffset(model, 0)).toBe('a.ts');
     expect(fileAtOffset(model, 115)).toBe('b.ts');
@@ -202,7 +235,10 @@ describe('fileAtOffset', () => {
 describe('rowKey', () => {
   it('identifies a row by what it is, so loading a file does not remount the window', () => {
     const before = buildRowModel([pendingFile('a.ts'), loadedFile('b.ts', 1)], METRICS);
-    const after = buildRowModel([loadedFile('a.ts', 1), loadedFile('b.ts', 1)], METRICS);
+    const after = buildRowModel(
+      [loadedFile('a.ts', 1), loadedFile('b.ts', 1)],
+      METRICS,
+    );
 
     const keyOf = (model: typeof before, fileId: string) =>
       model.rows.filter((row) => row.fileId === fileId).map(rowKey);
@@ -215,7 +251,11 @@ describe('rowKey', () => {
 
   it('gives every row in a document a distinct key', () => {
     const model = buildRowModel(
-      [loadedFile('a.ts', 2), pendingFile('b.ts'), fileWith('c.ts', { collapsed: true })],
+      [
+        loadedFile('a.ts', 2),
+        pendingFile('b.ts'),
+        fileWith('c.ts', { collapsed: true }),
+      ],
       METRICS,
     );
 
@@ -232,9 +272,214 @@ describe('metadata-only files', () => {
       diff: makeDiff('new.ts', 1),
       error: null,
       collapsed: false,
+      text: null,
+      revealed: [],
     };
 
     const model = buildRowModel([renamed], METRICS);
     expect(model.fileRowIndex.has('new.ts')).toBe(true);
+  });
+});
+
+describe('expanding context', () => {
+  /**
+   * One hunk covering new lines 21-22 of a 60-line file, so there is a gap of
+   * 20 lines above it and 38 below. The old side sits two lines earlier, which
+   * is what the context rows' left-hand numbers have to reflect.
+   */
+  function withContext(revealed: DocumentFile['revealed'] = []): DocumentFile {
+    const hunk = makeHunk('a.ts', 0, [
+      makeLine('delete', 'was', { old: 19 }),
+      makeLine('add', 'is', { new: 21 }),
+      makeLine('context', 'same', { old: 20, new: 22 }),
+    ]);
+
+    const file = loadedFile('a.ts', 1);
+    return {
+      ...file,
+      diff: {
+        ...makeDiff('a.ts', 1),
+        hunks: [{ ...hunk, oldStart: 19, newStart: 21 }],
+      },
+      text: {
+        original: Array.from({ length: 58 }, (_, i) => `old ${i + 1}`),
+        working: Array.from({ length: 60 }, (_, i) => `line ${i + 1}`),
+      },
+      revealed,
+    };
+  }
+
+  const kinds = (file: DocumentFile) =>
+    buildRowModel([file], METRICS).rows.map((row) => row.kind);
+
+  it('puts an expander on each side of a hunk that hides lines', () => {
+    expect(kinds(withContext())).toEqual([
+      'file-header',
+      'expander',
+      'hunk-header',
+      'line',
+      'line',
+      'line',
+      'expander',
+      'spacer',
+    ]);
+  });
+
+  it('offers no expander where there is nothing hidden', () => {
+    // A file with no text loaded cannot expand, whatever its hunks.
+    const file = loadedFile('a.ts', 1);
+    expect(kinds(file)).not.toContain('expander');
+  });
+
+  it('turns a revealed range into context rows', () => {
+    const rows = buildRowModel([withContext([{ start: 11, end: 20 }])], METRICS).rows;
+    const context = rows.filter((row) => row.kind === 'context');
+
+    expect(context).toHaveLength(10);
+    expect(rows.map((row) => row.kind).slice(0, 4)).toEqual([
+      'file-header',
+      'expander',
+      'context',
+      'context',
+    ]);
+  });
+
+  it('numbers revealed context correctly on both sides', () => {
+    const rows = buildRowModel([withContext([{ start: 11, end: 20 }])], METRICS).rows;
+    const first = rows.find((row) => row.kind === 'context');
+
+    // New line 11 is old line 9: the hunk's old side starts two lines earlier.
+    expect(first).toEqual({
+      kind: 'context',
+      fileId: 'a.ts',
+      lineNumber: 11,
+      oldLineNumber: 9,
+      rows: 1,
+    });
+  });
+
+  it('leaves an expander on both sides of context revealed mid-gap', () => {
+    const rows = buildRowModel([withContext([{ start: 6, end: 10 }])], METRICS).rows;
+
+    expect(rows.map((row) => row.kind).slice(0, 9)).toEqual([
+      'file-header',
+      'expander',
+      'context',
+      'context',
+      'context',
+      'context',
+      'context',
+      'expander',
+      'hunk-header',
+    ]);
+  });
+
+  it('marks which sides an expander can grow towards', () => {
+    const rows = buildRowModel([withContext()], METRICS).rows;
+    const expanders = rows.filter((row) => row.kind === 'expander');
+
+    // Nothing above the top of the file; nothing below the bottom.
+    expect(expanders[0]).toMatchObject({
+      range: { start: 1, end: 20 },
+      above: false,
+      below: true,
+    });
+    expect(expanders[1]).toMatchObject({
+      range: { start: 23, end: 60 },
+      above: true,
+      below: false,
+    });
+  });
+
+  it('widens the scroll area for long revealed lines', () => {
+    const file = withContext([{ start: 1, end: 20 }]);
+    const long = 'x'.repeat(400);
+    file.text = { ...file.text!, working: [...file.text!.working!] };
+    file.text.working![4] = long;
+
+    const model = buildRowModel([file], METRICS);
+    expect(model.contentWidth).toBe(METRICS.gutterWidth + 400 * METRICS.charWidth);
+  });
+
+  it('still gives every row a distinct key', () => {
+    const model = buildRowModel([withContext([{ start: 1, end: 20 }])], METRICS);
+    const keys = model.rows.map(rowKey);
+
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe('wrapping', () => {
+  const long = 'x'.repeat(250);
+
+  function fileWithLongLine(): DocumentFile {
+    const hunk = makeHunk('a.ts', 0, [
+      makeLine('context', 'short', { old: 1, new: 1 }),
+      makeLine('add', long, { new: 2 }),
+    ]);
+
+    return {
+      ...loadedFile('a.ts', 1),
+      // `maxLineLength` is what the Rust parser reports, not something the row
+      // model recomputes from the lines, so the fixture has to state it.
+      diff: { ...makeDiff('a.ts', 1), hunks: [hunk], maxLineLength: long.length },
+    };
+  }
+
+  it('leaves every line one row tall when wrapping is off', () => {
+    const model = buildRowModel([fileWithLongLine()], METRICS);
+    const lines = model.rows.filter((row) => row.kind === 'line');
+
+    expect(lines.map((row) => row.rows)).toEqual([1, 1]);
+  });
+
+  it('makes a wrapped line as many rows tall as it wraps to', () => {
+    const model = buildRowModel([fileWithLongLine()], METRICS, 120);
+    const lines = model.rows.filter((row) => row.kind === 'line');
+
+    // 250 characters at 120 is three visual lines; 'short' is still one.
+    expect(lines.map((row) => row.rows)).toEqual([1, 3]);
+  });
+
+  it('keeps offsets and the total height exact across a wrapped line', () => {
+    const model = buildRowModel([fileWithLongLine()], METRICS, 120);
+
+    // The whole scroll model rests on this: offsets are the running sum of
+    // heights, and a wrapped line contributes its full height to them.
+    let expected = 0;
+    model.rows.forEach((row, index) => {
+      expect(model.offsets[index]).toBe(expected);
+      expected += row.kind === 'line' ? METRICS.lineHeight * row.rows : 0;
+      if (row.kind === 'file-header') expected += METRICS.fileHeaderHeight - 0;
+      if (row.kind === 'hunk-header') expected += METRICS.lineHeight;
+      if (row.kind === 'spacer') expected += METRICS.fileGap;
+    });
+
+    expect(model.totalHeight).toBe(expected);
+  });
+
+  it('finds the right row at an offset inside a wrapped line', () => {
+    const model = buildRowModel([fileWithLongLine()], METRICS, 120);
+    const index = model.rows.findIndex((row) => row.kind === 'line' && row.rows === 3);
+
+    const top = model.offsets[index];
+    // Two rows into the wrapped line is still that same line.
+    expect(rowAtOffset(model, top + METRICS.lineHeight * 2)).toBe(index);
+    expect(rowAtOffset(model, top + METRICS.lineHeight * 3)).toBe(index + 1);
+  });
+
+  it('caps the scroll width at the wrap column', () => {
+    const wrapped = buildRowModel([fileWithLongLine()], METRICS, 120);
+    const scrolling = buildRowModel([fileWithLongLine()], METRICS);
+
+    expect(wrapped.contentWidth).toBe(METRICS.gutterWidth + 120 * METRICS.charWidth);
+    expect(scrolling.contentWidth).toBeGreaterThan(wrapped.contentWidth);
+  });
+
+  it('does not widen a document of short lines to the wrap column', () => {
+    const model = buildRowModel([loadedFile('a.ts', 1)], METRICS, 120);
+    expect(model.contentWidth).toBeLessThan(
+      METRICS.gutterWidth + 120 * METRICS.charWidth,
+    );
   });
 });

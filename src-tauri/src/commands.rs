@@ -7,9 +7,53 @@
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::git::model::{ChangedFile, FileDiff, RepositoryInfo};
 use crate::git::repository::{self, Side, DEFAULT_MAX_DIFF_BYTES};
-use crate::launch::resolve_launch_directory;
+use crate::launch::{self, resolve_launch_directory, LaunchOptions};
+use crate::settings::{self, Settings};
 use crate::state::AppState;
-use tauri::State;
+use tauri::{Manager, Runtime, State};
+
+/// Where `settings.json` lives, per the platform's own conventions.
+fn settings_path<R: Runtime>(app: &tauri::AppHandle<R>) -> std::path::PathBuf {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+    settings::file_path(&config_dir)
+}
+
+/// Current preferences.
+///
+/// Infallible by design: a missing or damaged file reads as the defaults, so
+/// the UI always has something to render and never blocks on this.
+#[tauri::command]
+pub fn get_settings<R: Runtime>(app: tauri::AppHandle<R>) -> Settings {
+    settings::load_from(&settings_path(&app))
+}
+
+/// Stores preferences, returning what was actually stored.
+///
+/// The value comes back because it is clamped on the way in, and the UI should
+/// show what it got rather than what it asked for.
+#[tauri::command]
+pub fn set_settings<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    settings: Settings,
+) -> AppResult<Settings> {
+    let path = settings_path(&app);
+    settings::save_to(&path, settings)?;
+    Ok(settings.sanitised())
+}
+
+/// How the app was launched.
+///
+/// The frontend reads this once before anything else. Under `--example` it
+/// serves its own sample diff and never calls the commands below, which is why
+/// nothing here has to know about example mode.
+#[tauri::command]
+pub fn get_launch_options() -> LaunchOptions {
+    launch::launch_options()
+}
 
 #[tauri::command]
 pub fn get_repository_info(state: State<'_, AppState>) -> AppResult<RepositoryInfo> {

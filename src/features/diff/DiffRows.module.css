@@ -1,5 +1,11 @@
 /* One absolutely positioned row. The virtualiser sets `top`; every row's
-   height is fixed and known, which is what makes the scroll model exact. */
+   height is fixed and known, which is what makes the scroll model exact.
+
+   Nothing here may override `position`: a row that is not `absolute` ignores
+   the `top` the virtualiser gave it and lands wherever normal flow puts it,
+   which is on top of the rows around it. The full-width bars below used to set
+   `position: sticky` to survive horizontal scrolling; that is now the pinned
+   layer's job (see `.pinned` in DiffDocument.module.css). */
 .row {
   position: absolute;
   left: 0;
@@ -10,14 +16,28 @@
 
 /* ---- Diff lines ---------------------------------------------------- */
 
+/* A diff line is as tall as the visual lines it wraps to, so its height comes
+   from the rows inside rather than from a fixed value. The column layout is
+   what lets a wrapped line stack them. */
 .line {
-  height: var(--row-height);
+  flex-direction: column;
+  align-items: stretch;
   font-family: var(--font-mono);
   font-size: var(--code-font-size);
   line-height: var(--row-height);
   white-space: pre;
   -webkit-user-select: text;
   user-select: text;
+}
+
+/* One visual line: exactly one row tall, whether it is a whole diff line or
+   the tail of a wrapped one. */
+.visualLine {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 100%;
+  height: var(--row-height);
 }
 
 .gutter {
@@ -81,6 +101,13 @@
   background: var(--bg);
 }
 
+/* The marker column on a wrapped continuation. Quiet on purpose: the missing
+   line numbers either side of it are the real signal, and this is only there so
+   that signal can be read at a glance. */
+.continuation {
+  color: var(--text-faint);
+}
+
 /* The changed words within a replaced line. */
 .word {
   border-radius: 2px;
@@ -138,8 +165,6 @@
   gap: 8px;
   height: var(--file-header-height);
   padding: 0 12px;
-  position: sticky;
-  left: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius) var(--radius) 0 0;
@@ -218,14 +243,61 @@
   color: var(--diff-remove-text);
 }
 
+/* ---- Expander ------------------------------------------------------- */
+
+/* The lines a hunk left out. Quieter than a hunk header — it is an offer, not
+   information — but tall enough to be a comfortable click target, which is why
+   it has a height of its own rather than borrowing the row height. */
+.expander {
+  gap: 10px;
+  height: var(--expander-height);
+  padding: 0 8px;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-faint);
+}
+
+.expanderActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.expanderButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.expanderButton:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.expanderLabel {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: calc(var(--code-font-size) - 1px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- Notices and placeholders --------------------------------------- */
 
 .notice {
   gap: 10px;
   height: var(--notice-height);
   padding: 0 14px;
-  position: sticky;
-  left: 0;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-top: 0;
@@ -253,8 +325,6 @@
 .placeholder {
   height: var(--placeholder-height);
   padding: 0 14px;
-  position: sticky;
-  left: 0;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-top: 0;

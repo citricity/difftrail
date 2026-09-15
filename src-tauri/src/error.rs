@@ -24,6 +24,9 @@ pub enum ErrorKind {
     InvalidDiff,
     /// Git ran and failed for a reason we do not specifically recognise.
     GitCommandFailed,
+    /// Preferences could not be written. Never raised on read — an unreadable
+    /// settings file falls back to the defaults instead.
+    SettingsFailed,
 }
 
 #[derive(Debug, Clone, Serialize)]

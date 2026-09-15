@@ -15,6 +15,7 @@ import type { RowMetrics } from '../lib/rows.ts';
 const FALLBACK: RowMetrics = {
   lineHeight: 20,
   fileHeaderHeight: 38,
+  expanderHeight: 24,
   noticeHeight: 44,
   placeholderHeight: 44,
   fileGap: 16,
@@ -66,6 +67,11 @@ export function useRowMetrics(): RowMetrics {
           styles,
           '--file-header-height',
           FALLBACK.fileHeaderHeight,
+        ),
+        expanderHeight: readPixels(
+          styles,
+          '--expander-height',
+          FALLBACK.expanderHeight,
         ),
         noticeHeight: readPixels(styles, '--notice-height', FALLBACK.noticeHeight),
         placeholderHeight: readPixels(

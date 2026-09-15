@@ -33,6 +33,7 @@ describe('documentReducer', () => {
       type: 'fileLoaded',
       fileId: 'a.ts',
       diff: makeDiff('a.ts', 2),
+      text: null,
     });
 
     expect(after.files[0].status).toBe('loaded');
@@ -71,6 +72,7 @@ describe('documentReducer', () => {
       type: 'fileLoaded',
       fileId: 'ghost.ts',
       diff: makeDiff('ghost.ts', 1),
+      text: null,
     });
 
     expect(after.files).toBe(state.files);

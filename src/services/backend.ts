@@ -7,12 +7,15 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { AppError } from '../types/index.ts';
 import type {
   ChangedFile,
   FileDiff,
   FileSide,
+  LaunchOptions,
   RepositoryInfo,
+  Settings,
 } from '../types/index.ts';
 import { fixtureCall } from './fixtures.ts';
 
@@ -26,11 +29,38 @@ export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
+/**
+ * How the backend was launched, read once.
+ *
+ * `difftrail --example` serves the built-in sample diff instead of a
+ * repository — useful for a demo, a screenshot, or working on the UI without
+ * arranging a working tree full of changes. Answering it here rather than in
+ * Rust means there is one sample to maintain, the one `pnpm dev` already uses,
+ * and that the Git commands are never called at all: example mode opens
+ * anywhere, repository or not.
+ *
+ * The answer cannot change while the process runs, so the first call's promise
+ * is what every later call awaits. A backend too old to know the command falls
+ * back to normal operation rather than passing sample data off as real.
+ */
+let launchOptions: Promise<LaunchOptions> | null = null;
+
+function getLaunchOptions(): Promise<LaunchOptions> {
+  launchOptions ??= invoke<LaunchOptions>('get_launch_options').catch(
+    (thrown: unknown) => {
+      console.error('[difftrail] get_launch_options failed', thrown);
+      return { example: false };
+    },
+  );
+
+  return launchOptions;
+}
+
 async function call<T>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  if (!isTauri()) {
+  if (!isTauri() || (await getLaunchOptions()).example) {
     return fixtureCall<T>(command, args);
   }
 
@@ -70,4 +100,30 @@ export function getFileContents(
   side: FileSide,
 ): Promise<string> {
   return call<string>('get_file_contents', { path, side });
+}
+
+/**
+ * Subscribes to the shell's Settings menu item.
+ *
+ * The menu belongs to the desktop shell and the dialog belongs to the webview,
+ * so the two meet here rather than either knowing about the other. Resolves
+ * with the unsubscribe; outside Tauri there is no menu and nothing to unhook.
+ */
+export async function onSettingsRequested(
+  handler: () => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => undefined;
+
+  return listen('settings-requested', () => {
+    handler();
+  });
+}
+
+export function getSettings(): Promise<Settings> {
+  return call<Settings>('get_settings');
+}
+
+/** Stores preferences and resolves with what was actually stored. */
+export function setSettings(settings: Settings): Promise<Settings> {
+  return call<Settings>('set_settings', { settings });
 }

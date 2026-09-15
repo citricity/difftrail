@@ -14,9 +14,15 @@ import type { ReactElement } from 'react';
 import { useElementSize } from '../../hooks/useElementSize.ts';
 import { offsetOfTarget, rowKey, visibleRange } from '../../lib/rows.ts';
 import type { RowMetrics, RowModel } from '../../lib/rows.ts';
-import { segmentsForHunk } from '../../lib/segments.ts';
-import type { ChangeLocation, DiffHunk, DocumentFile } from '../../types/index.ts';
+import { runsForContextLine, runsForLine } from '../../lib/rowRuns.ts';
+import type {
+  ChangeLocation,
+  DiffHunk,
+  DocumentFile,
+  LineRange,
+} from '../../types/index.ts';
 import { DiffLineRow } from './DiffLineRow.tsx';
+import { ExpanderRow } from './ExpanderRow.tsx';
 import { FileHeaderRow } from './FileHeaderRow.tsx';
 import { HunkHeaderRow } from './HunkHeaderRow.tsx';
 import { NoticeRow } from './NoticeRow.tsx';
@@ -40,6 +46,9 @@ interface Props {
   onVisibleFileChange: (fileId: string) => void;
   onToggleCollapse: (fileId: string) => void;
   onLoadFully: (fileId: string) => void;
+  onExpandContext: (fileId: string, range: LineRange) => void;
+  /** Column long lines wrap at, or null to scroll them horizontally. */
+  wrapColumn: number | null;
 }
 
 export function DiffDocument({
@@ -52,6 +61,8 @@ export function DiffDocument({
   onVisibleFileChange,
   onToggleCollapse,
   onLoadFully,
+  onExpandContext,
+  wrapColumn,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -151,7 +162,11 @@ export function DiffDocument({
 
   const stickyFile = visibleFile === null ? null : fileById.get(visibleFile) ?? null;
 
+  // Two layers: rows that scroll with the canvas on both axes, and the
+  // full-width bars, which stay put horizontally (see `.pinned`).
   const rendered: ReactElement[] = [];
+  const pinned: ReactElement[] = [];
+
   for (let index = range.start; index < range.end; index += 1) {
     const row = model.rows[index];
     const file = fileById.get(row.fileId);
@@ -162,7 +177,7 @@ export function DiffDocument({
 
     switch (row.kind) {
       case 'file-header':
-        rendered.push(
+        pinned.push(
           <FileHeaderRow
             key={key}
             style={style}
@@ -199,15 +214,52 @@ export function DiffDocument({
             key={key}
             style={style}
             line={line}
-            segments={segmentsForHunk(hunk).get(row.lineIndex)}
+            runs={runsForLine(hunk, row.lineIndex)}
+            wrapColumn={wrapColumn}
             active={current?.hunkId === hunk.id}
           />,
         );
         break;
       }
 
-      case 'notice':
+      case 'expander':
+        pinned.push(
+          <ExpanderRow
+            key={key}
+            style={style}
+            range={row.range}
+            above={row.above}
+            below={row.below}
+            onExpand={(range) => onExpandContext(file.meta.id, range)}
+          />,
+        );
+        break;
+
+      case 'context': {
+        const text = file.text;
+        if (text === null) break;
+
         rendered.push(
+          <DiffLineRow
+            key={key}
+            style={style}
+            line={{
+              kind: 'context',
+              content: text.working?.[row.lineNumber - 1] ?? '',
+              oldLineNumber: row.oldLineNumber,
+              newLineNumber: row.lineNumber,
+              noNewline: false,
+            }}
+            runs={runsForContextLine(text, row.lineNumber)}
+            wrapColumn={wrapColumn}
+            active={false}
+          />,
+        );
+        break;
+      }
+
+      case 'notice':
+        pinned.push(
           <NoticeRow
             key={key}
             style={style}
@@ -220,7 +272,7 @@ export function DiffDocument({
         break;
 
       case 'placeholder':
-        rendered.push(
+        pinned.push(
           <div
             key={key}
             style={style}
@@ -269,6 +321,13 @@ export function DiffDocument({
           style={{ height: model.totalHeight, width: canvasWidth }}
         >
           {rendered}
+
+          <div
+            className={styles.pinned}
+            style={{ width: viewportWidth > 0 ? viewportWidth : '100%' }}
+          >
+            {pinned}
+          </div>
         </div>
       </div>
 

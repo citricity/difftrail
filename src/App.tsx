@@ -11,10 +11,12 @@ import { StartupError } from './components/StartupError.tsx';
 import { DiffDocument } from './features/diff/DiffDocument.tsx';
 import { NavigationControls } from './features/navigation/NavigationControls.tsx';
 import { RepositoryHeader } from './features/repository/RepositoryHeader.tsx';
+import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
 import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
 import { useRowMetrics } from './hooks/useRowMetrics.ts';
+import { useSettings } from './hooks/useSettings.ts';
 import { buildRowModel } from './lib/rows.ts';
 import styles from './App.module.css';
 
@@ -26,15 +28,21 @@ export function App() {
     prefetchAround,
     loadFully,
     toggleCollapse,
+    revealContext,
   } = useRepositoryDiff();
 
   const metrics = useRowMetrics();
+  const settingsState = useSettings();
 
-  // Rebuilt whenever a diff arrives or a file is collapsed. Everything the
-  // virtualiser and the scroll model need is derived from here.
+  const wrapColumn = settingsState.settings.wrap
+    ? settingsState.settings.wrapLength
+    : null;
+
+  // Rebuilt whenever a diff arrives, a file is collapsed, or wrapping changes.
+  // Everything the virtualiser and the scroll model need is derived from here.
   const model = useMemo(
-    () => buildRowModel(state.files, metrics),
-    [state.files, metrics],
+    () => buildRowModel(state.files, metrics, wrapColumn),
+    [state.files, metrics, wrapColumn],
   );
 
   const navigation = useDiffNavigation(state.files, ensureLoaded);
@@ -64,6 +72,7 @@ export function App() {
       <header className={styles.toolbar}>
         <RepositoryHeader repository={state.repository} summary={summary} />
         <NavigationControls navigation={navigation} />
+        <SettingsDialog state={settingsState} />
       </header>
 
       <DiffDocument
@@ -76,6 +85,8 @@ export function App() {
         onVisibleFileChange={prefetchAround}
         onToggleCollapse={toggleCollapse}
         onLoadFully={handleLoadFully}
+        onExpandContext={revealContext}
+        wrapColumn={wrapColumn}
       />
     </div>
   );

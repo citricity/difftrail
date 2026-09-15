@@ -77,6 +77,28 @@ export interface RepositoryInfo {
 /** Which side of the comparison to read whole-file contents from. */
 export type FileSide = 'original' | 'working';
 
+/** An inclusive, one-based span of line numbers. */
+export interface LineRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * Both sides of a file, in full.
+ *
+ * Fetched alongside the diff and used for two things at once: highlighting
+ * each side as the whole program it is rather than as a hunk-sized fragment,
+ * and supplying the surrounding lines when the reader expands a gap.
+ *
+ * A side is null when it does not exist — an added file has no original, a
+ * deleted file has no working copy. Present only when every diff line was
+ * found to match the file it came from; see `loadFileText`.
+ */
+export interface FileText {
+  original: string[] | null;
+  working: string[] | null;
+}
+
 /**
  * A position in the global change sequence.
  *
@@ -104,4 +126,11 @@ export interface DocumentFile {
   error: string | null;
   /** User has collapsed this file's body in the document. */
   collapsed: boolean;
+  /** Both sides in full, when they could be read and matched to the diff. */
+  text: FileText | null;
+  /**
+   * Context the reader has expanded, in working-side line numbers. Sorted,
+   * non-overlapping and coalesced — see `lib/ranges.ts`.
+   */
+  revealed: LineRange[];
 }

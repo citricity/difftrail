@@ -14,9 +14,11 @@ import {
   summarise,
 } from '../lib/documentState.ts';
 import type { DocumentState } from '../lib/documentState.ts';
+import { prepareSyntax } from '../lib/syntax.ts';
 import { getChangedFiles, getFileDiff, getRepositoryInfo } from '../services/backend.ts';
+import { loadFileText } from '../services/fileText.ts';
 import { AppError } from '../types/index.ts';
-import type { FileDiff } from '../types/index.ts';
+import type { FileDiff, LineRange } from '../types/index.ts';
 
 /** Diffs read in parallel. Enough to keep Git busy, few enough to stay fair. */
 const MAX_CONCURRENT_DIFFS = 5;
@@ -46,6 +48,8 @@ export interface RepositoryDiff {
   /** Re-requests a truncated diff without the byte limit. */
   loadFully: (fileId: string) => Promise<FileDiff | null>;
   toggleCollapse: (fileId: string) => void;
+  /** Reveals a span of unchanged context the hunks left out. */
+  revealContext: (fileId: string, range: LineRange) => void;
 }
 
 export function useRepositoryDiff(): RepositoryDiff {
@@ -79,7 +83,20 @@ export function useRepositoryDiff(): RepositoryDiff {
 
         try {
           const diff = await getFileDiff(fileId, maxBytes);
-          if (alive.current) dispatch({ type: 'fileLoaded', fileId, diff });
+
+          // Both sides in full, which is what lets the file be highlighted as
+          // a program rather than as fragments, and lets the reader expand the
+          // context around a hunk. Null when they could not be read or did not
+          // match the diff, in which case both features stand down.
+          const text = await loadFileText(diff);
+
+          // Highlighting before the dispatch, not after, is what keeps the
+          // render path synchronous: by the time these rows exist, their
+          // colours are already cached against the hunks. It never rejects, so
+          // a file whose grammar is missing or broken still arrives, plain.
+          await prepareSyntax(diff, text);
+
+          if (alive.current) dispatch({ type: 'fileLoaded', fileId, diff, text });
           return diff;
         } catch (thrown) {
           // Drop the entry so the user can retry a transient failure.
@@ -135,6 +152,10 @@ export function useRepositoryDiff(): RepositoryDiff {
     dispatch({ type: 'fileCollapseToggled', fileId });
   }, []);
 
+  const revealContext = useCallback((fileId: string, range: LineRange): void => {
+    dispatch({ type: 'contextRevealed', fileId, range });
+  }, []);
+
   useEffect(() => {
     void (async () => {
       try {
@@ -166,5 +187,6 @@ export function useRepositoryDiff(): RepositoryDiff {
     prefetchAround,
     loadFully,
     toggleCollapse,
+    revealContext,
   };
 }
