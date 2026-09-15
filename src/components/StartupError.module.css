@@ -1,0 +1,43 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 32px;
+  text-align: center;
+}
+
+.icon {
+  color: var(--text-faint);
+}
+
+.title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.message {
+  max-width: 44ch;
+  color: var(--text-muted);
+}
+
+.detail {
+  max-width: 70ch;
+  max-height: 140px;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: left;
+  white-space: pre-wrap;
+  -webkit-user-select: text;
+  user-select: text;
+}

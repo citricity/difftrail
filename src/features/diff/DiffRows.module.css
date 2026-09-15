@@ -1,0 +1,291 @@
+/* One absolutely positioned row. The virtualiser sets `top`; every row's
+   height is fixed and known, which is what makes the scroll model exact. */
+.row {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* ---- Diff lines ---------------------------------------------------- */
+
+.line {
+  height: var(--row-height);
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  line-height: var(--row-height);
+  white-space: pre;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.gutter {
+  display: flex;
+  flex: 0 0 var(--gutter-width);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  height: 100%;
+  color: var(--text-faint);
+  text-align: right;
+  background: inherit;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.number {
+  flex: 1 1 50%;
+  padding-right: 8px;
+  overflow: hidden;
+}
+
+.marker {
+  flex: 0 0 18px;
+  padding-left: 6px;
+  text-align: left;
+}
+
+.content {
+  flex: 1 1 auto;
+  padding-right: 16px;
+}
+
+.add {
+  background: var(--diff-add-bg);
+}
+
+.add .marker {
+  color: var(--diff-add-text);
+}
+
+.add .gutter {
+  background: var(--diff-add-gutter);
+  color: var(--diff-add-text);
+}
+
+.delete {
+  background: var(--diff-remove-bg);
+}
+
+.delete .marker {
+  color: var(--diff-remove-text);
+}
+
+.delete .gutter {
+  background: var(--diff-remove-gutter);
+  color: var(--diff-remove-text);
+}
+
+.context {
+  background: var(--bg);
+}
+
+/* The changed words within a replaced line. */
+.word {
+  border-radius: 2px;
+}
+
+.add .word {
+  background: var(--diff-add-word);
+}
+
+.delete .word {
+  background: var(--diff-remove-word);
+}
+
+.noNewline {
+  padding-left: 8px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ---- Hunk header ---------------------------------------------------- */
+
+.hunk {
+  height: var(--row-height);
+  padding-left: 12px;
+  overflow: hidden;
+  background: var(--hunk-bg);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--hunk-text);
+  font-family: var(--font-mono);
+  font-size: calc(var(--code-font-size) - 1px);
+  line-height: var(--row-height);
+  white-space: pre;
+  cursor: default;
+}
+
+.hunkRange {
+  color: var(--text-faint);
+}
+
+.hunkHeading {
+  margin-left: 12px;
+  color: var(--text-muted);
+}
+
+/* The change the global navigation cursor is currently on. */
+.active {
+  background: var(--active-bg);
+  box-shadow: inset 2px 0 0 var(--active-outline);
+}
+
+/* ---- File header ---------------------------------------------------- */
+
+.fileHeader {
+  gap: 8px;
+  height: var(--file-header-height);
+  padding: 0 12px;
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.disclosure {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.disclosure:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.statusLetter {
+  flex: 0 0 auto;
+  width: 14px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  text-align: center;
+}
+
+.statusLetter[data-status='added'] {
+  color: var(--diff-add-text);
+}
+
+.statusLetter[data-status='deleted'] {
+  color: var(--diff-remove-text);
+}
+
+.path {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.directory {
+  color: var(--text-muted);
+}
+
+.name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.counts {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: calc(var(--code-font-size) - 1px);
+}
+
+.additions {
+  color: var(--diff-add-text);
+}
+
+.deletions {
+  color: var(--diff-remove-text);
+}
+
+/* ---- Notices and placeholders --------------------------------------- */
+
+.notice {
+  gap: 10px;
+  height: var(--notice-height);
+  padding: 0 14px;
+  position: sticky;
+  left: 0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-top: 0;
+  color: var(--text-muted);
+}
+
+.noticeText {
+  flex: 1 1 auto;
+}
+
+.noticeAction {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: default;
+}
+
+.noticeAction:hover {
+  background: var(--surface-hover);
+}
+
+.placeholder {
+  height: var(--placeholder-height);
+  padding: 0 14px;
+  position: sticky;
+  left: 0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-top: 0;
+  color: var(--text-faint);
+}
+
+.shimmer {
+  width: 40%;
+  max-width: 320px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 0%,
+    var(--border) 50%,
+    var(--border-subtle) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.spacer {
+  height: var(--file-gap);
+}

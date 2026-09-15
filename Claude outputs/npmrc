@@ -1,0 +1,4 @@
+# Peer ranges across the React 19 ecosystem are still catching up; warn rather
+# than refuse to install.
+strict-peer-dependencies=false
+auto-install-peers=true

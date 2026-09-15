@@ -1,0 +1,8 @@
+allowBuilds:
+  esbuild: true
+# pnpm settings. Current pnpm reads these here rather than from a "pnpm" field
+# in package.json.
+#
+# pnpm blocks dependency build scripts by default. esbuild needs its own to
+# link the platform binary that Vite compiles with, so it is allowed explicitly
+# rather than through an interactive `pnpm approve-builds`.

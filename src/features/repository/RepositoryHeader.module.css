@@ -1,0 +1,62 @@
+.header {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.name {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.branch {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.branchName {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detached {
+  color: var(--text-faint);
+}
+
+.summary {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.additions {
+  color: var(--diff-add-text);
+  font-family: var(--font-mono);
+}
+
+.deletions {
+  color: var(--diff-remove-text);
+  font-family: var(--font-mono);
+}
+
+.skeleton {
+  width: 140px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border-subtle);
+}

@@ -1,0 +1,64 @@
+.container {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* The scrolling viewport. Both axes scroll: vertically through the document,
+   horizontally through long lines (the gutter stays pinned via `sticky`).
+
+   Absolutely positioned rather than `height: 100%`: the parent is a flex item
+   with no explicit height, and a percentage height against that is not
+   reliably definite — WebKit can resolve it to `auto`, which leaves the
+   virtualiser measuring a viewport of zero and rendering overscan only.
+   `inset: 0` is unambiguous.
+
+   No `contain: strict` either: size containment and ResizeObserver interact
+   badly in WKWebView, which is the same failure by a different route. */
+.viewport {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* Full-height canvas the rows are positioned within. Its height is the sum of
+   every row in the document, so the scrollbar reflects the whole change set
+   even though only a window of rows exists in the DOM. */
+.canvas {
+  position: relative;
+}
+
+/* Shows which file the top of the viewport is inside, so a long file never
+   leaves the reader without a heading. */
+.stickyFile {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  height: var(--file-header-height);
+  pointer-events: none;
+  box-shadow: var(--shadow-toolbar);
+}
+
+.stickyFile > * {
+  pointer-events: auto;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.emptyTitle {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
