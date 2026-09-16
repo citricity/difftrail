@@ -14,6 +14,7 @@ export type {
   RepositoryInfo,
 } from './diff.ts';
 
+export type { GitAliasStatus } from './gitAlias.ts';
 export type { LaunchOptions } from './launch.ts';
 
 export type { Settings, ViewMode, WrapMode } from './settings.ts';

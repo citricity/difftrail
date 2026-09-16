@@ -18,6 +18,7 @@ import type {
   DiffLine,
   FileDiff,
   FileSide,
+  GitAliasStatus,
   RepositoryInfo,
   Settings,
 } from '../types/index.ts';
@@ -303,6 +304,18 @@ const REPOSITORY: RepositoryInfo = {
  */
 let settings: Settings = { ...DEFAULT_SETTINGS };
 
+const SAMPLE_BINARY = '/Applications/Diff Trail.app/Contents/MacOS/diff-trail';
+const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" >/dev/null 2>&1 & }; f`;
+
+/** The `git dt` alias, as far as the browser preview is concerned. */
+let gitAlias: GitAliasStatus = {
+  binary: SAMPLE_BINARY,
+  command: `git config --global alias.dt '${SAMPLE_ALIAS}'`,
+  existing: null,
+  installed: false,
+  warning: null,
+};
+
 function delay<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
 }
@@ -360,6 +373,15 @@ async function resolveFixture(
       };
       return delay(settings);
     }
+
+    // Outside Tauri there is no Git configuration to change, so these pretend,
+    // and remember the pretence until reload like settings do.
+    case 'get_git_alias_status':
+      return delay(gitAlias);
+
+    case 'install_git_alias':
+      gitAlias = { ...gitAlias, existing: SAMPLE_ALIAS, installed: true };
+      return delay(gitAlias);
 
     case 'get_image_bytes': {
       const path = typeof args?.path === 'string' ? args.path : '';

@@ -37,7 +37,13 @@ a deleted one — enough to try continuous scrolling and global Previous/Next
 Change against. The repository name reads `difftrail (example)` so it is never
 mistaken for real changes.
 
-To build and install the `git dt` alias:
+To set up `git dt`, open Diff Trail and choose **Diff Trail > Install 'git dt'
+Command…** (macOS). It shows the exact `git config --global` command it will run,
+and any `dt` alias it would replace, before running anything. It points the
+alias at the copy of Diff Trail you opened, and warns if that copy is somewhere
+temporary — a disk image, macOS app translocation, or a debug build.
+
+From a terminal, or on platforms without the menu, the script does the same:
 
 ```bash
 pnpm tauri build

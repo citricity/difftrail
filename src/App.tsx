@@ -12,6 +12,7 @@ import { DiffDocument } from './features/diff/DiffDocument.tsx';
 import { NavigationControls } from './features/navigation/NavigationControls.tsx';
 import { ViewModeToggle } from './features/navigation/ViewModeToggle.tsx';
 import { RepositoryHeader } from './features/repository/RepositoryHeader.tsx';
+import { GitAliasDialog } from './features/gitAlias/GitAliasDialog.tsx';
 import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
@@ -122,6 +123,9 @@ export function App() {
     return (
       <div className={styles.app}>
         <StartupError error={state.error} />
+        {/* Opening Diff Trail from Applications, outside any repository, lands
+            here — which is exactly when installing git dt is wanted. */}
+        <GitAliasDialog />
       </div>
     );
   }
@@ -133,6 +137,7 @@ export function App() {
         <NavigationControls navigation={navigation} />
         <ViewModeToggle value={viewMode} onChange={chooseViewMode} />
         <SettingsDialog state={settingsState} />
+        <GitAliasDialog />
       </header>
 
       <DiffDocument

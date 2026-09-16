@@ -6,6 +6,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::git::model::{ChangedFile, FileDiff, RepositoryInfo};
+use crate::git_alias::{self, AliasStatus, ConfigTarget};
 use crate::git::repository::{self, Side, DEFAULT_MAX_DIFF_BYTES};
 use crate::launch::{self, resolve_launch_directory, LaunchOptions};
 use crate::settings::{self, Settings};
@@ -127,4 +128,18 @@ pub fn get_image_bytes(
     };
 
     repository::image_bytes(&root, source, side).map(tauri::ipc::Response::new)
+}
+
+/// What installing the `git dt` alias would do: the command, the executable it
+/// would launch, and any alias already in its place. Read-only.
+#[tauri::command]
+pub fn get_git_alias_status() -> AppResult<AliasStatus> {
+    git_alias::status(&git_alias::current_binary()?, &ConfigTarget::Global)
+}
+
+/// Installs the `git dt` alias in the user's global Git configuration,
+/// pointing at this executable. Only ever called after the user confirms.
+#[tauri::command]
+pub fn install_git_alias() -> AppResult<AliasStatus> {
+    git_alias::install(&git_alias::current_binary()?, &ConfigTarget::Global)
 }

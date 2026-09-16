@@ -26,8 +26,13 @@ pub const SETTINGS_ID: &str = "settings";
 /// Emitted to the webview when the item is chosen.
 pub const SETTINGS_EVENT: &str = "settings-requested";
 
+/// The item that installs the `git dt` alias, and the event it sends. Like
+/// Settings, what it opens — a confirmation — belongs to the webview.
+pub const GIT_ALIAS_ID: &str = "install-git-alias";
+pub const GIT_ALIAS_EVENT: &str = "git-alias-requested";
+
 #[cfg(target_os = "macos")]
-pub fn install_settings<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+pub fn install_app_items<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
     // `menu()` is inherent on `AppHandle`, not a `Manager` method, so no trait
     // needs importing here — unlike `commands.rs`, which uses `Manager::path`.
     use tauri::menu::{MenuItem, MenuItemKind, PredefinedMenuItem};
@@ -46,15 +51,29 @@ pub fn install_settings<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<
     let settings =
         MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
 
+    // No shortcut: installing a command is a once-ever action.
+    let git_alias = MenuItem::with_id(
+        app,
+        GIT_ALIAS_ID,
+        "Install \u{2018}git dt\u{2019} Command…",
+        true,
+        None::<&str>,
+    )?;
+
     // Index 2 is immediately after About and its separator, which is where
-    // macOS puts this and where the muscle memory expects it. The separator
-    // after it keeps Services in its own group.
-    application.insert_items(&[&settings, &PredefinedMenuItem::separator(app)?], 2)?;
+    // macOS puts Settings and where the muscle memory expects it. The command
+    // item follows it in the same group, as VS Code's "Install 'code' command"
+    // sits with its app-level items. The separator after them keeps Services
+    // in its own group.
+    application.insert_items(
+        &[&settings, &git_alias, &PredefinedMenuItem::separator(app)?],
+        2,
+    )?;
 
     Ok(())
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn install_settings<R: Runtime>(_app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+pub fn install_app_items<R: Runtime>(_app: &tauri::AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }

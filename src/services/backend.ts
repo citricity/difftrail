@@ -13,6 +13,7 @@ import type {
   ChangedFile,
   FileDiff,
   FileSide,
+  GitAliasStatus,
   LaunchOptions,
   RepositoryInfo,
   Settings,
@@ -103,20 +104,58 @@ export function getFileContents(
 }
 
 /**
- * Subscribes to the shell's Settings menu item.
+ * Subscribes to one of the shell's menu items.
  *
- * The menu belongs to the desktop shell and the dialog belongs to the webview,
+ * The menu belongs to the desktop shell and the dialogs belong to the webview,
  * so the two meet here rather than either knowing about the other. Resolves
  * with the unsubscribe; outside Tauri there is no menu and nothing to unhook.
  */
-export async function onSettingsRequested(
-  handler: () => void,
-): Promise<() => void> {
+async function onMenuEvent(event: string, handler: () => void): Promise<() => void> {
   if (!isTauri()) return () => undefined;
 
-  return listen('settings-requested', () => {
+  return listen(event, () => {
     handler();
   });
+}
+
+/** Diff Trail > Settings… */
+export function onSettingsRequested(handler: () => void): Promise<() => void> {
+  return onMenuEvent('settings-requested', handler);
+}
+
+/** Diff Trail > Install 'git dt' Command… */
+export function onGitAliasRequested(handler: () => void): Promise<() => void> {
+  return onMenuEvent('git-alias-requested', handler);
+}
+
+/**
+ * Calls a command that acts on the user's machine rather than on a repository.
+ *
+ * Unlike `call`, example mode does not reroute it: `--example` swaps the
+ * repository for a sample, but the executable running and the user's Git
+ * configuration are real either way. Only outside Tauri, where there is no
+ * machine to act on, does the sample answer.
+ */
+async function callNative<T>(command: string): Promise<T> {
+  if (!isTauri()) return fixtureCall<T>(command);
+
+  try {
+    return await invoke<T>(command);
+  } catch (thrown) {
+    const error = AppError.from(thrown);
+    console.error(`[difftrail] ${command} failed`, error.detail ?? error.message);
+    throw error;
+  }
+}
+
+/** What installing `git dt` would do, without doing it. */
+export function getGitAliasStatus(): Promise<GitAliasStatus> {
+  return callNative<GitAliasStatus>('get_git_alias_status');
+}
+
+/** Installs `git dt` in the global Git configuration. */
+export function installGitAlias(): Promise<GitAliasStatus> {
+  return callNative<GitAliasStatus>('install_git_alias');
 }
 
 /**
