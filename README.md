@@ -8,6 +8,8 @@ to think about them.
 That last part is the point. Traditional diff tools scope next/previous-change
 navigation to the file you happen to have open; Diff Trail does not.
 
+*Usage documentation and binaries*: https://citricity.github.io/difftrail/
+
 ## Requirements
 
 - Node 20.19+, 22.13+ or 24+, and [pnpm](https://pnpm.io)
