@@ -6,7 +6,9 @@
 //! and untracked files never appear.
 
 use diff_trail_lib::git::model::FileStatus;
-use diff_trail_lib::git::repository::{changed_files, discover, file_diff, DEFAULT_MAX_DIFF_BYTES};
+use diff_trail_lib::git::repository::{
+    changed_files, discover, file_diff, image_bytes, Side, DEFAULT_MAX_DIFF_BYTES,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -292,4 +294,21 @@ fn an_unchanged_repository_reports_no_files() {
 
     let files = changed_files(fixture.path()).expect("list changed files");
     assert!(files.is_empty());
+}
+
+#[test]
+fn reads_both_sides_of_a_changed_image_byte_for_byte() {
+    let fixture = Fixture::new("image-sides");
+    // Not real PNGs, and they need not be: what matters is that the bytes,
+    // including a NUL and invalid UTF-8, come back exactly as stored.
+    let before: &[u8] = b"\x89PNG\r\n\x1a\n\x00before\xff";
+    let after: &[u8] = b"\x89PNG\r\n\x1a\n\x00after\xfe\xff";
+
+    fs::write(fixture.path().join("icon.png"), before).unwrap();
+    fixture.commit_all("add icon");
+    fs::write(fixture.path().join("icon.png"), after).unwrap();
+
+    let root = discover(fixture.path()).unwrap();
+    assert_eq!(image_bytes(&root, "icon.png", Side::Original).unwrap(), before);
+    assert_eq!(image_bytes(&root, "icon.png", Side::Working).unwrap(), after);
 }

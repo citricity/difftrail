@@ -1,0 +1,141 @@
+.trigger {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.trigger:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.dialog {
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+
+.header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: var(--toolbar-height);
+  padding: 0 8px 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+.close {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 12px;
+}
+
+.field {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.label {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+.number {
+  flex: 0 0 auto;
+  width: 72px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+}
+
+.select {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+/* Not in use under the current wrap mode. Still legible, because the value is
+   still stored and returns when fixed-column wrapping is chosen again. */
+.number:disabled {
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.select:focus-visible,
+.number:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.error {
+  margin: 0;
+  color: var(--diff-remove-text);
+  font-size: calc(var(--ui-font-size) - 1px);
+}

@@ -5,7 +5,16 @@
  * that "what the document is" stays separate from "how it gets loaded".
  */
 
-import type { AppError, ChangedFile, DocumentFile, FileDiff, RepositoryInfo } from '../types/index.ts';
+import type {
+  AppError,
+  ChangedFile,
+  DocumentFile,
+  FileDiff,
+  FileText,
+  LineRange,
+  RepositoryInfo,
+} from '../types/index.ts';
+import { addRange } from './ranges.ts';
 
 export type Phase = 'starting' | 'ready' | 'failed';
 
@@ -28,9 +37,10 @@ export type DocumentAction =
   | { type: 'repositoryLoaded'; repository: RepositoryInfo }
   | { type: 'filesLoaded'; files: ChangedFile[] }
   | { type: 'fileLoadStarted'; fileId: string }
-  | { type: 'fileLoaded'; fileId: string; diff: FileDiff }
+  | { type: 'fileLoaded'; fileId: string; diff: FileDiff; text: FileText | null }
   | { type: 'fileFailed'; fileId: string; message: string }
   | { type: 'fileCollapseToggled'; fileId: string }
+  | { type: 'contextRevealed'; fileId: string; range: LineRange }
   | { type: 'startupFailed'; error: AppError };
 
 function updateFile(
@@ -69,6 +79,8 @@ export function documentReducer(
           diff: null,
           error: null,
           collapsed: false,
+          text: null,
+          revealed: [],
         })),
       };
 
@@ -90,6 +102,7 @@ export function documentReducer(
           status: 'loaded',
           diff: action.diff,
           error: null,
+          text: action.text,
         })),
       };
 
@@ -110,6 +123,17 @@ export function documentReducer(
           ...file,
           collapsed: !file.collapsed,
         })),
+      };
+
+    case 'contextRevealed':
+      return {
+        ...state,
+        files: updateFile(state.files, action.fileId, (file) => {
+          const revealed = addRange(file.revealed, action.range);
+          // `addRange` returns the original array when there is nothing to
+          // add, which keeps the row model from rebuilding for a no-op click.
+          return revealed === file.revealed ? file : { ...file, revealed };
+        }),
       };
 
     case 'startupFailed':

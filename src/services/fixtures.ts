@@ -1,8 +1,14 @@
 /**
- * Sample data for running the UI in a plain browser (`pnpm dev`).
+ * The built-in sample diff.
  *
- * This exists so the interface can be worked on without launching the desktop
- * shell. It is never reached inside Tauri — see `isTauri` in `backend.ts`.
+ * Served in two situations, both decided in `backend.ts`: running the UI in a
+ * plain browser (`pnpm dev`), where there is no backend to call, and
+ * `difftrail --example`, where there is one but the user asked for the sample
+ * instead. One sample covers both, so there is nothing to keep in step.
+ *
+ * It is deliberately varied rather than realistic — a multi-hunk file, two
+ * single-hunk files, a binary file and a deleted file — so that every row type
+ * and the file-crossing navigation are all exercised.
  */
 
 import { AppError } from '../types/index.ts';
@@ -11,8 +17,22 @@ import type {
   DiffHunk,
   DiffLine,
   FileDiff,
+  FileSide,
+  GitAliasStatus,
   RepositoryInfo,
+  Settings,
 } from '../types/index.ts';
+import { DEFAULT_SETTINGS, MAX_WRAP_LENGTH, MIN_WRAP_LENGTH } from '../types/index.ts';
+import iconAfter from './fixtureImages/icon-after.png';
+import iconBefore from './fixtureImages/icon-before.png';
+
+/**
+ * The sample's changed image, both sides. Real files served by Vite, fetched
+ * when asked for, rather than kilobytes of base64 in this module.
+ */
+const IMAGES: Record<string, { original: string; working: string }> = {
+  'assets/icon.png': { original: iconBefore, working: iconAfter },
+};
 
 /** Simulated backend latency, so loading states are visible in development. */
 const LATENCY_MS = 120;
@@ -108,15 +128,30 @@ const DIFFS: Record<string, FileDiff> = {
         line('context', '  const [scrollTop, setScrollTop] = useState(0);', 18, 18),
         line('context', '', 19, 19),
         line('delete', '  const rows = buildRowModel(files);', 20, null),
-        line('add', '  const rows = useMemo(() => buildRowModel(files, metrics), [files, metrics]);', null, 20),
+        line(
+          'add',
+          '  const rows = useMemo(() => buildRowModel(files, metrics), [files, metrics]);',
+          null,
+          20,
+        ),
         line('context', '', 21, 21),
         line('context', '  return (', 22, 22),
       ]),
       hunk('src/features/diff/DiffDocument.tsx', 1, 64, 'function DiffDocument()', [
         line('context', '      {visible.map((row) => (', 64, 64),
         line('delete', '        <DiffRow key={row.id} row={row} />', 65, null),
-        line('add', '        <DiffRow key={row.id} row={row} active={row.hunkId === activeHunk} />', null, 65),
-        line('add', '        // highlight follows the global navigation cursor', null, 66),
+        line(
+          'add',
+          '        <DiffRow key={row.id} row={row} active={row.hunkId === activeHunk} />',
+          null,
+          65,
+        ),
+        line(
+          'add',
+          '        // highlight follows the global navigation cursor',
+          null,
+          66,
+        ),
         line('add', '', null, 67),
         line('context', '      ))}', 66, 68),
       ]),
@@ -137,7 +172,12 @@ const DIFFS: Record<string, FileDiff> = {
         line('context', 'export function buildNavigationIndex(files) {', 31, 31),
         line('delete', '  return files.flatMap((file) => file.hunks);', 32, null),
         line('add', '  return files.flatMap((file) =>', null, 32),
-        line('add', '    file.loaded ? file.hunks : [{ kind: "file", id: file.id }],', null, 33),
+        line(
+          'add',
+          '    file.loaded ? file.hunks : [{ kind: "file", id: file.id }],',
+          null,
+          33,
+        ),
         line('add', '  );', null, 34),
         line('context', '}', 33, 35),
       ]),
@@ -194,12 +234,86 @@ const DIFFS: Record<string, FileDiff> = {
   },
 };
 
+/**
+ * Whole-file contents for the sample diff.
+ *
+ * Built from the diffs themselves — each line is placed at the number its hunk
+ * claims, and the space between is filled — so the sample exercises expanding
+ * context and whole-file highlighting exactly as a real repository would, and
+ * cannot drift out of step with the hunks above.
+ */
+const FILLER = [
+  'import { useCallback, useMemo, useRef } from "react";',
+  '',
+  '/**',
+  ' * Kept deliberately small. See the architecture notes for why.',
+  ' */',
+  'export interface Options {',
+  '  readonly overscan: number;',
+  '  readonly gap: number;',
+  '}',
+  '',
+  'const DEFAULTS: Options = { overscan: 12, gap: 14 };',
+  '',
+  'function clamp(value: number, low: number, high: number): number {',
+  '  return Math.min(high, Math.max(low, value));',
+  '}',
+  '',
+];
+
+/** Length of each side, chosen so every file has gaps worth expanding. */
+const SIDE_LENGTH: Record<string, { original: number; working: number }> = {
+  'src/features/diff/DiffDocument.tsx': { original: 96, working: 98 },
+  'src/lib/navigation.ts': { original: 72, working: 74 },
+  'src/styles/tokens.css': { original: 40, working: 40 },
+};
+
+function sideFor(diff: FileDiff, side: FileSide): string[] | null {
+  const lengths = SIDE_LENGTH[diff.path];
+  if (lengths === undefined) return null;
+
+  const wanted = side === 'original' ? 'oldLineNumber' : 'newLineNumber';
+  const length = side === 'original' ? lengths.original : lengths.working;
+
+  const lines = Array.from({ length }, (_, index) => FILLER[index % FILLER.length]);
+
+  for (const hunk of diff.hunks) {
+    for (const line of hunk.lines) {
+      const number = line[wanted];
+      if (number !== null && number <= length) lines[number - 1] = line.content;
+    }
+  }
+
+  return lines;
+}
+
 const REPOSITORY: RepositoryInfo = {
   root: '/Users/you/Development/difftrail',
-  name: 'difftrail',
+  name: 'difftrail (example)',
   branch: 'main',
   head: 'a1b2c3d',
   detached: false,
+};
+
+/**
+ * Preferences for the sample, held in memory.
+ *
+ * Changing a setting in example mode or in the browser behaves normally for the
+ * life of the session and is forgotten on reload, which is the honest analogue
+ * of a backend that is not there to write a file.
+ */
+let settings: Settings = { ...DEFAULT_SETTINGS };
+
+const SAMPLE_BINARY = '/Applications/Diff Trail.app/Contents/MacOS/diff-trail';
+const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" >/dev/null 2>&1 & }; f`;
+
+/** The `git dt` alias, as far as the browser preview is concerned. */
+let gitAlias: GitAliasStatus = {
+  binary: SAMPLE_BINARY,
+  command: `git config --global alias.dt '${SAMPLE_ALIAS}'`,
+  existing: null,
+  installed: false,
+  warning: null,
 };
 
 function delay<T>(value: T): Promise<T> {
@@ -230,8 +344,70 @@ async function resolveFixture(
       return delay(diff);
     }
 
-    case 'get_file_contents':
-      return delay('');
+    case 'get_settings':
+      return delay(settings);
+
+    case 'set_settings': {
+      const requested = (args?.settings ?? {}) as Partial<Settings>;
+      settings = {
+        wrap:
+          requested.wrap === 'off' ||
+          requested.wrap === 'column' ||
+          requested.wrap === 'auto'
+            ? requested.wrap
+            : settings.wrap,
+        // Falls back to what is already stored, not to the default: a call
+        // that only changes the wrap column must not reset the view mode.
+        defaultViewMode:
+          requested.defaultViewMode === undefined
+            ? settings.defaultViewMode
+            : requested.defaultViewMode === 'split'
+              ? 'split'
+              : 'unified',
+        // Clamped here too, so the fixture cannot accept a value the real
+        // backend would have refused.
+        wrapLength: Math.min(
+          MAX_WRAP_LENGTH,
+          Math.max(MIN_WRAP_LENGTH, requested.wrapLength ?? settings.wrapLength),
+        ),
+      };
+      return delay(settings);
+    }
+
+    // Outside Tauri there is no Git configuration to change, so these pretend,
+    // and remember the pretence until reload like settings do.
+    case 'get_git_alias_status':
+      return delay(gitAlias);
+
+    case 'install_git_alias':
+      gitAlias = { ...gitAlias, existing: SAMPLE_ALIAS, installed: true };
+      return delay(gitAlias);
+
+    case 'get_image_bytes': {
+      const path = typeof args?.path === 'string' ? args.path : '';
+      const side: FileSide = args?.side === 'original' ? 'original' : 'working';
+      const url = IMAGES[path]?.[side];
+      if (url === undefined) {
+        throw new AppError({
+          kind: 'binaryFile',
+          message: `${path} is not an image Diff Trail can show.`,
+          detail: null,
+        });
+      }
+      const bytes = await fetch(url).then((response) => response.arrayBuffer());
+      return delay(bytes);
+    }
+
+    case 'get_file_contents': {
+      const path = typeof args?.path === 'string' ? args.path : '';
+      const side: FileSide = args?.side === 'original' ? 'original' : 'working';
+      const diff = DIFFS[path];
+      const lines = diff === undefined ? null : sideFor(diff, side);
+
+      // An empty string stands for "nothing useful here", which the caller
+      // reads as a file it cannot expand — the binary and deleted samples.
+      return delay(lines === null ? '' : `${lines.join('\n')}\n`);
+    }
 
     default:
       throw new AppError({

@@ -1,5 +1,11 @@
 /* One absolutely positioned row. The virtualiser sets `top`; every row's
-   height is fixed and known, which is what makes the scroll model exact. */
+   height is fixed and known, which is what makes the scroll model exact.
+
+   Nothing here may override `position`: a row that is not `absolute` ignores
+   the `top` the virtualiser gave it and lands wherever normal flow puts it,
+   which is on top of the rows around it. The full-width bars below used to set
+   `position: sticky` to survive horizontal scrolling; that is now the pinned
+   layer's job (see `.pinned` in DiffDocument.module.css). */
 .row {
   position: absolute;
   left: 0;
@@ -10,14 +16,28 @@
 
 /* ---- Diff lines ---------------------------------------------------- */
 
+/* A diff line is as tall as the visual lines it wraps to, so its height comes
+   from the rows inside rather than from a fixed value. The column layout is
+   what lets a wrapped line stack them. */
 .line {
-  height: var(--row-height);
+  flex-direction: column;
+  align-items: stretch;
   font-family: var(--font-mono);
   font-size: var(--code-font-size);
   line-height: var(--row-height);
   white-space: pre;
   -webkit-user-select: text;
   user-select: text;
+}
+
+/* One visual line: exactly one row tall, whether it is a whole diff line or
+   the tail of a wrapped one. */
+.visualLine {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 100%;
+  height: var(--row-height);
 }
 
 .gutter {
@@ -29,7 +49,18 @@
   height: 100%;
   color: var(--text-faint);
   text-align: right;
-  background: inherit;
+  /* Opaque, because code slides underneath it when a long line is scrolled
+     sideways. `inherit` cannot provide that: the parent is the transparent
+     visual-line wrapper, and in dark mode the diff tints are translucent
+     anyway. So the row's whole background is rebuilt here as layers over the
+     page colour — gutter tint, active highlight, line tint — each one set as
+     a custom property by the row or pane that owns it, which inherits the
+     same way in the unified and the split view. */
+  background:
+    linear-gradient(var(--gutter-tint, transparent), var(--gutter-tint, transparent)),
+    linear-gradient(var(--active-tint, transparent), var(--active-tint, transparent)),
+    linear-gradient(var(--line-tint, transparent), var(--line-tint, transparent)),
+    var(--bg);
   -webkit-user-select: none;
   user-select: none;
 }
@@ -48,10 +79,13 @@
 
 .content {
   flex: 1 1 auto;
-  padding-right: 16px;
+  padding-right: var(--content-padding);
 }
 
 .add {
+  --line-tint: var(--diff-add-bg);
+  --gutter-tint: var(--diff-add-gutter);
+
   background: var(--diff-add-bg);
 }
 
@@ -60,11 +94,13 @@
 }
 
 .add .gutter {
-  background: var(--diff-add-gutter);
   color: var(--diff-add-text);
 }
 
 .delete {
+  --line-tint: var(--diff-remove-bg);
+  --gutter-tint: var(--diff-remove-gutter);
+
   background: var(--diff-remove-bg);
 }
 
@@ -73,12 +109,18 @@
 }
 
 .delete .gutter {
-  background: var(--diff-remove-gutter);
   color: var(--diff-remove-text);
 }
 
 .context {
   background: var(--bg);
+}
+
+/* The marker column on a wrapped continuation. Quiet on purpose: the missing
+   line numbers either side of it are the real signal, and this is only there so
+   that signal can be read at a glance. */
+.continuation {
+  color: var(--text-faint);
 }
 
 /* The changed words within a replaced line. */
@@ -98,6 +140,50 @@
   padding-left: 8px;
   color: var(--text-faint);
   font-style: italic;
+}
+
+/* ---- Split view ------------------------------------------------------ */
+
+/* Two panes sharing a baseline. The row takes its height from the taller of
+   them, which is why neither pane sets one: a line that wraps on one side has
+   to push the other side's blank space down with it. */
+.splitRow {
+  align-items: stretch;
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  line-height: var(--row-height);
+  white-space: pre;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* A pane clips rather than scrolls — see `PaneScrollbar` for why. */
+.pane {
+  display: flex;
+  flex: 1 1 50%;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* No line here to face the other side. Distinct from an empty line, which is
+   a real line that happens to have no text on it. */
+.paneAbsent {
+  background: var(--surface-sunken);
+  opacity: 0.55;
+}
+
+.paneContent {
+  flex: 1 1 auto;
+  padding-right: var(--content-padding);
+  will-change: transform;
+}
+
+.paneDivider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--border);
 }
 
 /* ---- Hunk header ---------------------------------------------------- */
@@ -128,6 +214,8 @@
 
 /* The change the global navigation cursor is currently on. */
 .active {
+  --active-tint: var(--active-bg);
+
   background: var(--active-bg);
   box-shadow: inset 2px 0 0 var(--active-outline);
 }
@@ -138,8 +226,6 @@
   gap: 8px;
   height: var(--file-header-height);
   padding: 0 12px;
-  position: sticky;
-  left: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius) var(--radius) 0 0;
@@ -182,24 +268,84 @@
   color: var(--diff-remove-text);
 }
 
+/* A flex row rather than one run of text, so the two parts can truncate
+   separately: the directory shrinks a thousand times faster than the name, so
+   a long path gives up its folders first and the file name last. */
 .path {
+  display: flex;
   flex: 1 1 auto;
+  align-items: baseline;
+  min-width: 0;
   overflow: hidden;
   font-family: var(--font-mono);
   font-size: var(--code-font-size);
-  text-overflow: ellipsis;
   white-space: nowrap;
   -webkit-user-select: text;
   user-select: text;
 }
 
 .directory {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
+  text-overflow: ellipsis;
 }
 
 .name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text);
   font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+/* The sticky header's path, which opens the file list. Sized to its text
+   rather than the whole bar, so it reads as a control and the counts beside
+   it stay plain. */
+.pathButton {
+  flex: 0 1 auto;
+  align-items: center;
+  margin-left: -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pathButton:hover {
+  background: var(--surface-hover);
+}
+
+.pathButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.pathButton .directory,
+.pathButton .name {
+  line-height: 1.4;
+}
+
+.pathChevron {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  color: var(--text-faint);
+}
+
+.pathButton:hover .pathChevron {
+  color: var(--text-muted);
+}
+
+/* The counts sit after the path, pushed to the far edge. */
+.fileHeader .counts {
+  margin-left: auto;
 }
 
 .counts {
@@ -218,14 +364,115 @@
   color: var(--diff-remove-text);
 }
 
+/* ---- Expander ------------------------------------------------------- */
+
+/* The lines a hunk left out. Quieter than a hunk header — it is an offer, not
+   information — but tall enough to be a comfortable click target, which is why
+   it has a height of its own rather than borrowing the row height. */
+.expander {
+  gap: 10px;
+  height: var(--expander-height);
+  padding: 0 8px;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-faint);
+}
+
+.expanderActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.expanderButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.expanderButton:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.expanderLabel {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: calc(var(--code-font-size) - 1px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Images ---------------------------------------------------------- */
+
+/* Before and after, side by side, in a row of fixed height. The height is set
+   here, not left to the content: the model reserves exactly this much, and a
+   picture has to be fitted into it rather than decide it. */
+.image {
+  height: var(--image-row-height);
+  align-items: stretch;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 0;
+}
+
+.imagePane {
+  display: flex;
+  flex: 1 1 50%;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px 12px;
+}
+
+.imageLabel {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+/* The space a picture is fitted into. `min-height: 0` lets it take the row's
+   height rather than the picture's. */
+.imageFrame {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+/* Scaled down to fit, keeping its proportions; never scaled up. */
+.imagePicture {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.imageMissing {
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
 /* ---- Notices and placeholders --------------------------------------- */
 
 .notice {
   gap: 10px;
   height: var(--notice-height);
   padding: 0 14px;
-  position: sticky;
-  left: 0;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-top: 0;
@@ -253,8 +500,6 @@
 .placeholder {
   height: var(--placeholder-height);
   padding: 0 14px;
-  position: sticky;
-  left: 0;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-top: 0;
@@ -288,4 +533,50 @@
 
 .spacer {
   height: var(--file-gap);
+}
+
+/* ---- End of document ------------------------------------------------ */
+
+/* The space after the last file. Its height is set by the component so that
+   any change can be revealed at the top of the viewport; the message sits at
+   the top of that space and the rest is deliberately empty. */
+.end {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 48px;
+}
+
+.endContent {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  max-width: calc(100% - 32px);
+}
+
+/* Single-colour line art used as a mask, so its colour is a token. Which
+   drawing it is arrives as `--mascot-image`, set by the component; the box is
+   square, and `contain` fits each drawing's own proportions inside it. */
+.mascot {
+  flex: 0 0 auto;
+  width: var(--mascot-size, 112px);
+  height: var(--mascot-size, 112px);
+  background: var(--mascot);
+  -webkit-mask: var(--mascot-image) center / contain no-repeat;
+  mask: var(--mascot-image) center / contain no-repeat;
+}
+
+.endText {
+  min-width: 0;
+}
+
+.endTitle {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.endDetail {
+  margin: 0;
+  color: var(--text-muted);
 }

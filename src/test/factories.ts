@@ -82,6 +82,8 @@ export function loadedFile(path: string, hunkCount: number): DocumentFile {
     diff: makeDiff(path, hunkCount),
     error: null,
     collapsed: false,
+    text: null,
+    revealed: [],
   };
 }
 
@@ -93,5 +95,7 @@ export function pendingFile(path: string): DocumentFile {
     diff: null,
     error: null,
     collapsed: false,
+    text: null,
+    revealed: [],
   };
 }

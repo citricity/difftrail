@@ -30,6 +30,57 @@
   position: relative;
 }
 
+/* Holds the rows that span the full width — file headers, notices,
+   placeholders — so horizontal scrolling does not carry them off the left
+   edge while long lines are being read.
+
+   Sticky on the horizontal axis only: no `top` is set, so it never detaches
+   vertically, and its height is zero so it takes part in flow without
+   displacing anything. The rows inside stay absolutely positioned at their
+   document offsets and scroll vertically as they always did. Its width is set
+   to the viewport's by the component, which is exactly what gives `left: 0`
+   room to shift within the wider canvas. */
+.pinned {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  height: 0;
+}
+
+/* In the split view the panes clip and translate instead, so the viewport
+   must not offer a horizontal axis of its own — two scrollers would fight. */
+.viewportSplit {
+  overflow-x: hidden;
+}
+
+/* The split view's own horizontal scrollbar, since the viewport no longer
+   provides one. Sits above the document rather than inside it, so it stays
+   put while the diff scrolls past. */
+.paneScrollTrack {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  height: 10px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.paneScrollThumb {
+  position: absolute;
+  top: 2px;
+  height: 6px;
+  min-width: 28px;
+  border-radius: 3px;
+  background: var(--border);
+  cursor: default;
+}
+
+.paneScrollThumb:hover {
+  background: var(--text-faint);
+}
+
 /* Shows which file the top of the viewport is inside, so a long file never
    leaves the reader without a heading. */
 .stickyFile {
@@ -55,6 +106,15 @@
   justify-content: center;
   height: 100%;
   color: var(--text-muted);
+}
+
+/* The idle mascot, larger than the one at the end of a document: here it is the
+   whole of what the window has to show. Sized through the shared rule's
+   variable rather than by overriding it. */
+.emptyMascot {
+  --mascot-size: 168px;
+
+  margin-bottom: 10px;
 }
 
 .emptyTitle {

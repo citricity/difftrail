@@ -183,4 +183,69 @@ describe('useDiffNavigation', () => {
     expect(result.current.canGoNext).toBe(false);
     expect(result.current.canGoPrevious).toBe(false);
   });
+
+  describe('goToFile', () => {
+    it("lands on a loaded file's first change, and Next carries on from there", () => {
+      const { result } = setup([loadedFile('a.ts', 2), loadedFile('b.ts', 2)]);
+
+      act(() => result.current.goToFile('b.ts'));
+      expect(result.current.current).toEqual({ fileId: 'b.ts', hunkId: 'b.ts:hunk:0' });
+
+      act(() => result.current.goNext());
+      expect(result.current.current?.hunkId).toBe('b.ts:hunk:1');
+    });
+
+    it('goes to the header at once for an unread file, then its first change', async () => {
+      const loader = loaderFor(makeDiff('b.ts', 3));
+      const { result } = setup([loadedFile('a.ts', 1), pendingFile('b.ts')], loader);
+
+      act(() => result.current.goToFile('b.ts'));
+      expect(result.current.current).toEqual({ fileId: 'b.ts', hunkId: null });
+
+      await waitFor(() => expect(result.current.current?.hunkId).toBe('b.ts:hunk:0'));
+      expect(loader).toHaveBeenCalledWith('b.ts');
+    });
+
+    it('stops at the header of a collapsed file, which has no hunk rows', () => {
+      const collapsed = { ...loadedFile('b.ts', 2), collapsed: true };
+      const { result } = setup([loadedFile('a.ts', 1), collapsed]);
+
+      act(() => result.current.goToFile('b.ts'));
+      expect(result.current.current).toEqual({ fileId: 'b.ts', hunkId: null });
+    });
+
+    it('asks for a reveal even when the destination is where it already is', () => {
+      const { result } = setup([loadedFile('a.ts', 1)]);
+
+      act(() => result.current.goToFile('a.ts'));
+      const first = result.current.revealRequest;
+
+      act(() => result.current.goToFile('a.ts'));
+      expect(result.current.revealRequest).toBe(first + 1);
+    });
+
+    it('is overtaken by a later step while the file loads', async () => {
+      let resolve: (diff: FileDiff) => void = () => undefined;
+      const loader = vi.fn(
+        () => new Promise<FileDiff | null>((done) => (resolve = done)),
+      );
+      const { result } = setup([loadedFile('a.ts', 1), pendingFile('b.ts')], loader);
+
+      act(() => result.current.goToFile('b.ts'));
+      act(() => result.current.goTo({ fileId: 'a.ts', hunkId: 'a.ts:hunk:0' }));
+
+      await act(async () => {
+        resolve(makeDiff('b.ts', 2));
+        await Promise.resolve();
+      });
+
+      expect(result.current.current?.fileId).toBe('a.ts');
+    });
+
+    it('ignores a file that is not in the diff', () => {
+      const { result } = setup([loadedFile('a.ts', 1)]);
+      act(() => result.current.goToFile('missing.ts'));
+      expect(result.current.current).toBeNull();
+    });
+  });
 });

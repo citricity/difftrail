@@ -15,11 +15,14 @@ import type { RowMetrics } from '../lib/rows.ts';
 const FALLBACK: RowMetrics = {
   lineHeight: 20,
   fileHeaderHeight: 38,
+  expanderHeight: 24,
   noticeHeight: 44,
   placeholderHeight: 44,
+  imageHeight: 260,
   fileGap: 16,
   charWidth: 7.8,
   gutterWidth: 104,
+  contentPadding: 16,
 };
 
 /** Reads a CSS custom property from the document root as a number of pixels. */
@@ -67,18 +70,29 @@ export function useRowMetrics(): RowMetrics {
           '--file-header-height',
           FALLBACK.fileHeaderHeight,
         ),
+        expanderHeight: readPixels(
+          styles,
+          '--expander-height',
+          FALLBACK.expanderHeight,
+        ),
         noticeHeight: readPixels(styles, '--notice-height', FALLBACK.noticeHeight),
         placeholderHeight: readPixels(
           styles,
           '--placeholder-height',
           FALLBACK.placeholderHeight,
         ),
+        imageHeight: readPixels(styles, '--image-row-height', FALLBACK.imageHeight),
         fileGap: readPixels(styles, '--file-gap', FALLBACK.fileGap),
         charWidth: measureCharWidth(
           `${fontSize}px ${fontFamily}`,
           FALLBACK.charWidth,
         ),
         gutterWidth: readPixels(styles, '--gutter-width', FALLBACK.gutterWidth),
+        contentPadding: readPixels(
+          styles,
+          '--content-padding',
+          FALLBACK.contentPadding,
+        ),
       });
     };
 

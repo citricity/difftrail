@@ -1,0 +1,163 @@
+.dialog {
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+
+.header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: var(--toolbar-height);
+  padding: 0 8px 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+.close {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+  line-height: 1.45;
+}
+
+.body p {
+  margin: 0;
+}
+
+.body code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  /* "git dt" is one thing; never break it across lines. */
+  white-space: nowrap;
+}
+
+.title code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.label {
+  color: var(--text-muted);
+}
+
+/* The command, in full: it is what the user is agreeing to, so it wraps rather
+   than hiding its end off the right edge. */
+.code {
+  max-height: 140px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: calc(var(--code-font-size) - 1px);
+  white-space: pre-wrap;
+  word-break: break-all;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.success {
+  font-weight: 600;
+}
+
+.warning {
+  padding: 8px 10px;
+  border-left: 3px solid var(--diff-remove-text);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.error {
+  color: var(--diff-remove-text);
+}
+
+.footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.button {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  cursor: default;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
