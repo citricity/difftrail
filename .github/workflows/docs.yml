@@ -1,0 +1,77 @@
+# Publishes docs/ to GitHub Pages, with release.json describing the latest
+# release so the page's download button always points at current installers.
+#
+# Runs after every release (dispatched by release.yml), whenever docs/ changes
+# on main, and on demand. Needs Pages enabled with "GitHub Actions" as its source:
+# Settings → Pages → Build and deployment.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+# Deployments replace each other, so only the newest one matters.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Describe the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R docs/. _site/
+
+          # "Latest" is GitHub's: the newest published release that is neither
+          # a draft nor a pre-release. Before the first one, the page says so.
+          if gh api "repos/$GITHUB_REPOSITORY/releases/latest" > latest.json 2> error.txt; then
+            jq '{
+              version: (.tag_name | ltrimstr("v")),
+              tag: .tag_name,
+              url: .html_url,
+              publishedAt: .published_at,
+              assets: [.assets[] | {name, url: .browser_download_url, size}]
+            }' latest.json > _site/release.json
+          elif grep -q "Not Found" error.txt; then
+            echo "::notice::No published release yet."
+            echo '{"version": null, "assets": []}' > _site/release.json
+          else
+            cat error.txt >&2
+            exit 1
+          fi
+
+          cat _site/release.json
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
