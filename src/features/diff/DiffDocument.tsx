@@ -17,13 +17,16 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { ReactElement } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 import { useElementSize } from '../../hooks/useElementSize.ts';
 import {
+  SCROLL_MARGIN,
   anchorAt,
+  endOfDocumentHeight,
   lineAreaWidth,
   offsetOfAnchor,
   offsetOfTarget,
+  rowAtOffset,
   rowKey,
   visibleRange,
 } from '../../lib/rows.ts';
@@ -37,21 +40,23 @@ import type {
   ViewMode,
 } from '../../types/index.ts';
 import { DiffLineRow } from './DiffLineRow.tsx';
+import { EndOfDocument } from './EndOfDocument.tsx';
+import { SESSION_IDLE_MASCOT } from './mascots.ts';
 import { ExpanderRow } from './ExpanderRow.tsx';
 import { PaneScrollbar } from './PaneScrollbar.tsx';
 import { SplitLineRow } from './SplitLineRow.tsx';
 import type { PaneLine } from './SplitLineRow.tsx';
 import { FileHeaderRow } from './FileHeaderRow.tsx';
+import type { FileListAnchor } from './FileHeaderRow.tsx';
+import { FileNavigator } from '../files/FileNavigator.tsx';
 import { HunkHeaderRow } from './HunkHeaderRow.tsx';
+import { ImageRow } from './ImageRow.tsx';
 import { NoticeRow } from './NoticeRow.tsx';
 import styles from './DiffDocument.module.css';
 import rowStyles from './DiffRows.module.css';
 
 /** Rows rendered beyond each edge of the viewport. */
 const OVERSCAN = 12;
-
-/** Breathing room above a revealed change, on top of the sticky file header. */
-const SCROLL_MARGIN = 8;
 
 interface Props {
   files: DocumentFile[];
@@ -60,7 +65,14 @@ interface Props {
   /** True until the changed-file list has arrived. */
   loading: boolean;
   current: ChangeLocation | null;
+  /**
+   * Bumped when the view must be brought to `current` even though it has not
+   * changed — see `DiffNavigation.revealRequest`.
+   */
+  revealRequest: number;
   onSelect: (location: ChangeLocation) => void;
+  /** Go to a file chosen from the file list. */
+  onSelectFile: (fileId: string) => void;
   onVisibleFileChange: (fileId: string) => void;
   onToggleCollapse: (fileId: string) => void;
   onLoadFully: (fileId: string) => void;
@@ -82,7 +94,9 @@ export function DiffDocument({
   metrics,
   loading,
   current,
+  revealRequest,
   onSelect,
+  onSelectFile,
   onVisibleFileChange,
   onToggleCollapse,
   onLoadFully,
@@ -197,7 +211,7 @@ export function DiffDocument({
     const element = viewportRef.current;
     if (element === null || current === null) return;
 
-    const key = `${current.fileId}|${current.hunkId ?? ''}`;
+    const key = `${current.fileId}|${current.hunkId ?? ''}|${revealRequest}`;
     if (lastRevealed.current === key) return;
 
     const offset = offsetOfTarget(model, current.fileId, current.hunkId);
@@ -208,60 +222,71 @@ export function DiffDocument({
     element.scrollTop = Math.max(0, offset - metrics.fileHeaderHeight - SCROLL_MARGIN);
     liveScrollTop.current = element.scrollTop;
     setScrollTop(element.scrollTop);
-  }, [current, model, metrics.fileHeaderHeight, viewport]);
+  }, [current, model, metrics.fileHeaderHeight, revealRequest, viewport]);
 
   /**
-   * Keeps the reader's place when the wrap column changes.
+   * Keeps the reader's place whenever the model is rebuilt.
    *
-   * A new column changes the height of every wrapped line, including all the
-   * ones above the viewport, so an unchanged `scrollTop` would show a different
-   * part of the document — and in auto mode that happens continuously while
-   * the window is resized. So the row at the top of the viewport is found in
-   * the model being replaced and put back at the top in the new one.
+   * Rows above the viewport change height all the time: a new wrap column
+   * changes every wrapped line, continuously while an auto-wrapped window is
+   * resized, and a diff arriving turns a one-row placeholder into a file's
+   * worth of rows. With `scrollTop` left alone, each of those shows a different
+   * part of the document. So the row at the top of the viewport is found in the
+   * model being replaced and put back at the top in the new one.
    *
-   * A layout effect, so the correction lands before paint and the jump is
-   * never seen. Limited to column changes: other rebuilds (a diff arriving, a
-   * file collapsing) have their own expectations about where the view goes.
+   * This used to run for wrap changes only, and the file list showed why that
+   * was not enough: jumping to the last of many files landed correctly, then
+   * the files above it loaded, pushed it down the page, and the prefetching
+   * that followed the drift loaded the next ones up, and so on.
+   *
+   * A layout effect, so the correction lands before paint and is never seen.
+   * It runs before the reveal effect, so a rebuild that also brings a new
+   * navigation target is anchored first and then revealed.
    */
-  const previousLayout = useRef({ model, wrapColumn });
+  const previousModel = useRef(model);
 
   useLayoutEffect(() => {
-    const before = previousLayout.current;
-    previousLayout.current = { model, wrapColumn };
+    const before = previousModel.current;
+    previousModel.current = model;
 
     const element = viewportRef.current;
-    if (
-      element === null ||
-      before.model === model ||
-      before.wrapColumn === wrapColumn
-    ) {
-      return;
-    }
+    if (element === null || before === model) return;
 
-    const anchor = anchorAt(before.model, liveScrollTop.current);
+    const anchor = anchorAt(before, liveScrollTop.current);
     if (anchor === null) return;
 
     const restored = offsetOfAnchor(model, anchor);
-    if (restored === null) return;
+    if (restored === null || Math.abs(restored - liveScrollTop.current) < 0.5) return;
 
     element.scrollTop = restored;
     liveScrollTop.current = element.scrollTop;
     setScrollTop(element.scrollTop);
-  }, [model, wrapColumn]);
+  }, [model]);
 
   // Let the loader know which part of the document is being read, so it can
   // fetch the neighbouring diffs before they are scrolled into view.
+  //
+  // Measured where a reveal puts its target — below the sticky file header and
+  // its margin — rather than at the viewport's top edge, which the header
+  // covers. At the edge it named the file above whenever a revealed change sat
+  // a few pixels past a file boundary, which is exactly where a reveal puts
+  // one; just under the header it still did for a revealed file header, whose
+  // margin belongs to the file before.
   const visibleFile = useMemo(() => {
     if (model.rows.length === 0) return null;
-    const range = visibleRange(model, scrollTop, viewportHeight, 0);
-    return model.rows[range.start]?.fileId ?? null;
-  }, [model, scrollTop, viewportHeight]);
+    const row = rowAtOffset(
+      model,
+      scrollTop + metrics.fileHeaderHeight + SCROLL_MARGIN,
+    );
+    return model.rows[row]?.fileId ?? null;
+  }, [model, scrollTop, metrics.fileHeaderHeight]);
 
   useEffect(() => {
     if (visibleFile !== null) onVisibleFileChange(visibleFile);
   }, [visibleFile, onVisibleFileChange]);
 
   const range = visibleRange(model, scrollTop, viewportHeight, OVERSCAN);
+  const endHeight = endOfDocumentHeight(viewportHeight, metrics);
 
   // A pane is half the viewport less the divider; in the unified view the
   // canvas is as wide as the content and the viewport scrolls over it.
@@ -294,6 +319,17 @@ export function DiffDocument({
   );
 
   const stickyFile = visibleFile === null ? null : (fileById.get(visibleFile) ?? null);
+
+  /** Where the file list hangs from, or null while it is closed. */
+  const [fileListAnchor, setFileListAnchor] = useState<FileListAnchor | null>(null);
+  const closeFileList = useCallback(() => setFileListAnchor(null), []);
+  const selectFile = useCallback(
+    (fileId: string) => {
+      setFileListAnchor(null);
+      onSelectFile(fileId);
+    },
+    [onSelectFile],
+  );
 
   // Two layers: rows that scroll with the canvas on both axes, and the
   // full-width bars, which stay put horizontally (see `.pinned`).
@@ -444,6 +480,15 @@ export function DiffDocument({
         );
         break;
 
+      case 'image':
+        // Pinned, like the other full-width bars: nothing in it scrolls sideways.
+        if (file.diff !== null) {
+          pinned.push(
+            <ImageRow key={key} style={style} meta={file.meta} diff={file.diff} />,
+          );
+        }
+        break;
+
       case 'placeholder':
         pinned.push(
           <div
@@ -470,6 +515,14 @@ export function DiffDocument({
             <span>Reading the working tree…</span>
           ) : (
             <>
+              {/* Only here, with nothing to review: a hedgehog with the day off. */}
+              <span
+                className={`${rowStyles.mascot} ${styles.emptyMascot}`}
+                style={
+                  { '--mascot-image': `url("${SESSION_IDLE_MASCOT}")` } as CSSProperties
+                }
+                aria-hidden="true"
+              />
               <span className={styles.emptyTitle}>No unstaged changes</span>
               <span>Every tracked file matches the index.</span>
             </>
@@ -494,7 +547,7 @@ export function DiffDocument({
       >
         <div
           className={styles.canvas}
-          style={{ height: model.totalHeight, width: canvasWidth }}
+          style={{ height: model.totalHeight + endHeight, width: canvasWidth }}
         >
           {rendered}
 
@@ -503,6 +556,11 @@ export function DiffDocument({
             style={{ width: viewportWidth > 0 ? viewportWidth : '100%' }}
           >
             {pinned}
+
+            <EndOfDocument
+              style={{ top: model.totalHeight, height: endHeight }}
+              fileCount={files.length}
+            />
           </div>
         </div>
       </div>
@@ -522,8 +580,19 @@ export function DiffDocument({
             file={stickyFile}
             active={false}
             onToggleCollapse={() => onToggleCollapse(stickyFile.meta.id)}
+            onOpenFileList={setFileListAnchor}
           />
         </div>
+      )}
+
+      {fileListAnchor !== null && (
+        <FileNavigator
+          files={files}
+          currentFileId={stickyFile?.meta.id ?? null}
+          anchor={fileListAnchor}
+          onSelect={selectFile}
+          onClose={closeFileList}
+        />
       )}
     </div>
   );

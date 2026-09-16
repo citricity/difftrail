@@ -32,6 +32,7 @@ pub fn run() {
             commands::get_changed_files,
             commands::get_file_diff,
             commands::get_file_contents,
+            commands::get_image_bytes,
             commands::get_settings,
             commands::set_settings,
         ])

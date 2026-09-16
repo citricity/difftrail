@@ -85,6 +85,9 @@ Deliberately small: `CLAUDE.md` puts complex preference screens out of scope.
 | `n` / `j` | Next change     |
 | `p` / `k` | Previous change |
 
+In the file list: type to filter, `↑` / `↓` to move, `Enter` to go, `Esc` to
+close.
+
 ## Architecture
 
 ```
@@ -243,6 +246,42 @@ and then **every diff line is checked against the file it claims to come
 from**. A single disagreement, which is what a working tree edited mid-review
 looks like, withdraws the file from both features rather than showing
 surrounding lines that are quietly wrong.
+
+### Going to a file
+
+Changes are the main way through a review; files are a way to skip ahead. The
+sticky file header at the top of the document names the file you are in, and
+clicking its path drops down a list of every changed file, opened on that one.
+Type to filter — fuzzily, so `dd` finds `DiffDocument.tsx` — then use the
+arrows and Enter, or click.
+
+Choosing a file lands on its **first change**, so Next and Previous carry on
+from there, loading the file first if it has not been read. A collapsed file
+lands on its header instead. Filtering ranks consecutive characters, word
+starts and the file name above scattered matches in the directory
+(`lib/fileFilter.ts`).
+
+The document ends with space to spare — at least a viewport's worth, and a
+short message from the mascot — so that a change in the last file can still be
+scrolled up to sit under the sticky header. Without it, jumping near the end
+stopped short and the header went on naming the file above.
+
+A persistent sidebar was considered and passed over: it would cost width all
+the time, which the split view and wrapping at the window edge need most, and
+opening the list on the current file gives most of what a sidebar that follows
+you would.
+
+### Images
+
+A changed image is shown rather than reported as a binary file: before on the
+left, after on the right, each scaled down to fit a row of fixed height
+(`--image-row-height`) and never scaled up. An added image has nothing before it
+and a deleted one nothing after. PNG, JPEG, GIF, WebP, BMP, ICO and AVIF are
+shown; SVG is not on the list because Git diffs it as text.
+
+The bytes come from `get_image_bytes`, returned as a raw binary IPC body rather
+than JSON. It reads only image files, and declines anything over 20 MB. Each
+side is fetched when its row first comes into view and cached against the diff.
 
 ### Lazy loading
 

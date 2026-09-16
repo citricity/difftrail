@@ -268,24 +268,84 @@
   color: var(--diff-remove-text);
 }
 
+/* A flex row rather than one run of text, so the two parts can truncate
+   separately: the directory shrinks a thousand times faster than the name, so
+   a long path gives up its folders first and the file name last. */
 .path {
+  display: flex;
   flex: 1 1 auto;
+  align-items: baseline;
+  min-width: 0;
   overflow: hidden;
   font-family: var(--font-mono);
   font-size: var(--code-font-size);
-  text-overflow: ellipsis;
   white-space: nowrap;
   -webkit-user-select: text;
   user-select: text;
 }
 
 .directory {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
+  text-overflow: ellipsis;
 }
 
 .name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text);
   font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+/* The sticky header's path, which opens the file list. Sized to its text
+   rather than the whole bar, so it reads as a control and the counts beside
+   it stay plain. */
+.pathButton {
+  flex: 0 1 auto;
+  align-items: center;
+  margin-left: -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pathButton:hover {
+  background: var(--surface-hover);
+}
+
+.pathButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.pathButton .directory,
+.pathButton .name {
+  line-height: 1.4;
+}
+
+.pathChevron {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  color: var(--text-faint);
+}
+
+.pathButton:hover .pathChevron {
+  color: var(--text-muted);
+}
+
+/* The counts sit after the path, pushed to the far edge. */
+.fileHeader .counts {
+  margin-left: auto;
 }
 
 .counts {
@@ -351,6 +411,60 @@
   font-size: calc(var(--code-font-size) - 1px);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---- Images ---------------------------------------------------------- */
+
+/* Before and after, side by side, in a row of fixed height. The height is set
+   here, not left to the content: the model reserves exactly this much, and a
+   picture has to be fitted into it rather than decide it. */
+.image {
+  height: var(--image-row-height);
+  align-items: stretch;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 0;
+}
+
+.imagePane {
+  display: flex;
+  flex: 1 1 50%;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px 12px;
+}
+
+.imageLabel {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+/* The space a picture is fitted into. `min-height: 0` lets it take the row's
+   height rather than the picture's. */
+.imageFrame {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+/* Scaled down to fit, keeping its proportions; never scaled up. */
+.imagePicture {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.imageMissing {
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
 }
 
 /* ---- Notices and placeholders --------------------------------------- */
@@ -419,4 +533,50 @@
 
 .spacer {
   height: var(--file-gap);
+}
+
+/* ---- End of document ------------------------------------------------ */
+
+/* The space after the last file. Its height is set by the component so that
+   any change can be revealed at the top of the viewport; the message sits at
+   the top of that space and the rest is deliberately empty. */
+.end {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 48px;
+}
+
+.endContent {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  max-width: calc(100% - 32px);
+}
+
+/* Single-colour line art used as a mask, so its colour is a token. Which
+   drawing it is arrives as `--mascot-image`, set by the component; the box is
+   square, and `contain` fits each drawing's own proportions inside it. */
+.mascot {
+  flex: 0 0 auto;
+  width: var(--mascot-size, 112px);
+  height: var(--mascot-size, 112px);
+  background: var(--mascot);
+  -webkit-mask: var(--mascot-image) center / contain no-repeat;
+  mask: var(--mascot-image) center / contain no-repeat;
+}
+
+.endText {
+  min-width: 0;
+}
+
+.endTitle {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.endDetail {
+  margin: 0;
+  color: var(--text-muted);
 }

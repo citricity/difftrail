@@ -10,8 +10,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AUTO_WRAP_MARGIN,
   MIN_AUTO_WRAP_COLUMN,
+  END_OF_DOCUMENT_MIN_HEIGHT,
+  SCROLL_MARGIN,
   anchorAt,
   autoWrapColumn,
+  endOfDocumentHeight,
   buildRowModel,
   fileAtOffset,
   offsetOfAnchor,
@@ -37,6 +40,7 @@ const METRICS: RowMetrics = {
   expanderHeight: 24,
   noticeHeight: 50,
   placeholderHeight: 60,
+  imageHeight: 240,
   fileGap: 10,
   charWidth: 8,
   gutterWidth: 100,
@@ -668,7 +672,43 @@ describe('scroll anchoring', () => {
     );
   });
 
-  it('gives up when the anchored row is no longer in the model', () => {
+  it("falls back to the file's header when its row has gone", () => {
+    // A placeholder is replaced by the rows of the diff it stood for.
+    const pending = buildRowModel(
+      [loadedFile('a.ts', 1), pendingFile('b.ts')],
+      METRICS,
+    );
+    const placeholder = pending.rows.findIndex((row) => row.kind === 'placeholder');
+    const anchor = anchorAt(pending, pending.offsets[placeholder] + 5);
+    if (anchor === null) throw new Error('expected an anchor');
+
+    const loaded = buildRowModel(
+      [loadedFile('a.ts', 1), loadedFile('b.ts', 2)],
+      METRICS,
+    );
+    expect(offsetOfAnchor(loaded, anchor)).toBe(
+      loaded.offsets[loaded.fileRowIndex.get('b.ts')!],
+    );
+  });
+
+  it('holds a row in place when a file above it grows', () => {
+    // The file list's jump to the last file: its neighbours load afterwards.
+    const before = buildRowModel([pendingFile('a.ts'), loadedFile('b.ts', 2)], METRICS);
+    const hunk = before.hunkRowIndex.get('b.ts:hunk:1')!;
+    const anchor = anchorAt(before, before.offsets[hunk]);
+    if (anchor === null) throw new Error('expected an anchor');
+
+    const after = buildRowModel(
+      [loadedFile('a.ts', 3), loadedFile('b.ts', 2)],
+      METRICS,
+    );
+    const restored = offsetOfAnchor(after, anchor);
+
+    expect(restored).toBe(after.offsets[after.hunkRowIndex.get('b.ts:hunk:1')!]);
+    expect(restored).toBeGreaterThan(before.offsets[hunk]);
+  });
+
+  it('gives up when the anchored file is no longer in the model', () => {
     const model = buildRowModel([fileWithLongLineAbove()], METRICS, 120);
     const anchor = anchorAt(model, model.offsets[2]);
     if (anchor === null) throw new Error('expected an anchor');
@@ -679,5 +719,64 @@ describe('scroll anchoring', () => {
 
   it('has nothing to anchor to in an empty document', () => {
     expect(anchorAt(buildRowModel([], METRICS), 0)).toBeNull();
+  });
+});
+
+describe('endOfDocumentHeight', () => {
+  it('lets the last row of the document reach the reveal position', () => {
+    const model = buildRowModel([loadedFile('a.ts', 2)], METRICS);
+    const viewport = 600;
+    const end = endOfDocumentHeight(viewport, METRICS);
+
+    // Reveal the last hunk header: it should land just under the sticky header,
+    // which needs the canvas to extend a viewport below that scroll position.
+    const target = model.offsets[model.hunkRowIndex.get('a.ts:hunk:1')!];
+    const scrollTop = target - METRICS.fileHeaderHeight - SCROLL_MARGIN;
+    const maxScrollTop = model.totalHeight + end - viewport;
+
+    expect(maxScrollTop).toBeGreaterThanOrEqual(scrollTop);
+  });
+
+  it('is never shorter than its message needs', () => {
+    expect(endOfDocumentHeight(100, METRICS)).toBe(END_OF_DOCUMENT_MIN_HEIGHT);
+  });
+
+  it('grows with the viewport', () => {
+    expect(endOfDocumentHeight(1000, METRICS)).toBe(
+      1000 - METRICS.fileHeaderHeight - SCROLL_MARGIN,
+    );
+  });
+});
+
+describe('images', () => {
+  function binaryFile(path: string): DocumentFile {
+    return {
+      ...loadedFile(path, 0),
+      diff: { ...makeDiff(path, 0), binary: true, hunks: [] },
+    };
+  }
+
+  it('gives a changed image a row of its own, with its fixed height', () => {
+    const model = buildRowModel([binaryFile('assets/icon.png')], METRICS);
+    const index = model.rows.findIndex((row) => row.kind === 'image');
+
+    expect(index).toBe(1);
+    expect(model.offsets[index + 1] - model.offsets[index]).toBe(METRICS.imageHeight);
+    expect(rowKey(model.rows[index])).toBe('i:assets/icon.png');
+  });
+
+  it('still shows the binary notice for a binary file that is not an image', () => {
+    const model = buildRowModel([binaryFile('data/blob.bin')], METRICS);
+    expect(model.rows.map((row) => row.kind)).toEqual([
+      'file-header',
+      'notice',
+      'spacer',
+    ]);
+  });
+
+  it('shows the collapsed notice, not the image, for a collapsed image', () => {
+    const collapsed = { ...binaryFile('assets/icon.png'), collapsed: true };
+    const model = buildRowModel([collapsed], METRICS);
+    expect(model.rows.some((row) => row.kind === 'image')).toBe(false);
   });
 });

@@ -168,29 +168,79 @@ impl Side {
 
 /// Reads one whole side of a file, for expanding context beyond the hunks.
 pub fn file_contents(root: &Path, path: &str, side: Side) -> AppResult<String> {
+    file_bytes(root, path, side).map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Largest image either side may be, in bytes. It crosses the IPC boundary
+/// whole and is decoded in the webview, so an accidental 200 MB asset should
+/// be declined rather than attempted.
+pub const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
+
+/// Extensions the webview can display as an image. Kept to formats WebKit,
+/// WebView2 and WebKitGTK all decode; SVG is absent because Git diffs it as the
+/// text it is.
+const IMAGE_EXTENSIONS: [&str; 8] = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif"];
+
+/// Whether a path names a file the diff can show as an image.
+pub fn is_image_path(path: &str) -> bool {
+    path.rsplit_once('.')
+        .map(|(_, extension)| {
+            let extension = extension.to_ascii_lowercase();
+            IMAGE_EXTENSIONS.contains(&extension.as_str())
+        })
+        .unwrap_or(false)
+}
+
+/// Reads one side of an image, raw.
+///
+/// Refuses anything that is not an image by extension, so this cannot become
+/// a general way to pull arbitrary bytes into the webview, and anything over
+/// `MAX_IMAGE_BYTES`.
+pub fn image_bytes(root: &Path, path: &str, side: Side) -> AppResult<Vec<u8>> {
+    if !is_image_path(path) {
+        return Err(AppError::new(
+            ErrorKind::BinaryFile,
+            format!("{path} is not an image Diff Trail can show."),
+        ));
+    }
+
+    let bytes = file_bytes(root, path, side)?;
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return Err(AppError::new(
+            ErrorKind::BinaryFile,
+            format!(
+                "{path} is too large to preview ({} MB).",
+                bytes.len() / (1024 * 1024)
+            ),
+        ));
+    }
+
+    Ok(bytes)
+}
+
+/// Reads one whole side of a file as bytes, exactly as stored.
+fn file_bytes(root: &Path, path: &str, side: Side) -> AppResult<Vec<u8>> {
     match side {
         Side::Original => {
             // `:path` is the index version, which is the left side of `git diff`.
             let spec = format!(":{path}");
             let output = run(root, &["show", &spec])?;
-            Ok(output.text())
+            Ok(output.stdout)
         }
         Side::Working => {
             let full = root.join(path);
-            std::fs::read(&full)
-                .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
-                .map_err(|err| match err.kind() {
-                    std::io::ErrorKind::NotFound => AppError::file_not_found(path),
-                    std::io::ErrorKind::PermissionDenied => AppError::new(
-                        ErrorKind::PermissionDenied,
-                        format!("Diff Trail cannot read {path}."),
-                    ),
-                    _ => AppError::new(
-                        ErrorKind::GitCommandFailed,
-                        format!("Could not read {path}."),
-                    )
-                    .with_detail(err.to_string()),
-                })
+            std::fs::read(&full).map_err(|err| match err.kind() {
+                std::io::ErrorKind::NotFound => AppError::file_not_found(path),
+                std::io::ErrorKind::PermissionDenied => AppError::new(
+                    ErrorKind::PermissionDenied,
+                    format!("Diff Trail cannot read {path}."),
+                ),
+                _ => AppError::new(
+                    ErrorKind::GitCommandFailed,
+                    format!("Could not read {path}."),
+                )
+                .with_detail(err.to_string()),
+            })
         }
     }
 }
@@ -198,6 +248,23 @@ pub fn file_contents(root: &Path, path: &str, side: Side) -> AppResult<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognises_image_paths_by_extension_in_any_case() {
+        assert!(is_image_path("assets/icon.png"));
+        assert!(is_image_path("photos/Holiday.JPG"));
+        assert!(is_image_path("a.b/c.webp"));
+        assert!(!is_image_path("logo.svg"));
+        assert!(!is_image_path("src/png.ts"));
+        assert!(!is_image_path("Makefile"));
+        assert!(!is_image_path("dir.png/readme"));
+    }
+
+    #[test]
+    fn image_bytes_refuses_a_file_that_is_not_an_image() {
+        let error = image_bytes(Path::new("."), "src/main.rs", Side::Working).unwrap_err();
+        assert_eq!(error.kind, ErrorKind::BinaryFile);
+    }
 
     #[test]
     fn side_parses_known_values() {

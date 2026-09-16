@@ -18,6 +18,7 @@
  */
 
 import type { DiffHunk, DocumentFile, LineRange, ViewMode } from '../types/index.ts';
+import { imageMimeType } from './images.ts';
 import { pairHunkLines } from './pairing.ts';
 import { splitGap } from './ranges.ts';
 import { wrapCount } from './wrap.ts';
@@ -68,6 +69,12 @@ export type DocumentRow =
       rows: number;
     }
   | { kind: 'notice'; fileId: string; notice: NoticeKind }
+  /**
+   * A changed image, shown before and after. Its own fixed height, like a
+   * notice: the pictures are scaled to fit it, so how large they are never
+   * reaches the geometry.
+   */
+  | { kind: 'image'; fileId: string }
   | { kind: 'placeholder'; fileId: string }
   | { kind: 'spacer'; fileId: string };
 
@@ -78,6 +85,8 @@ export interface RowMetrics {
   expanderHeight: number;
   noticeHeight: number;
   placeholderHeight: number;
+  /** Height of the before-and-after row of a changed image. */
+  imageHeight: number;
   /** Vertical gap after each file. */
   fileGap: number;
   /** Width of one monospace character, for the horizontal scroll area. */
@@ -177,6 +186,8 @@ function heightOf(row: DocumentRow, metrics: RowMetrics): number {
       return metrics.noticeHeight;
     case 'placeholder':
       return metrics.placeholderHeight;
+    case 'image':
+      return metrics.imageHeight;
     case 'spacer':
       return metrics.fileGap;
   }
@@ -209,7 +220,8 @@ function noticeFor(file: DocumentFile): NoticeKind | null {
   if (file.collapsed) return 'collapsed';
   if (file.status === 'error') return 'error';
   if (file.diff === null) return null;
-  if (file.diff.binary) return 'binary';
+  // A binary image is shown rather than excused; see `buildRowModel`.
+  if (file.diff.binary) return imageMimeType(file.meta.path) === null ? 'binary' : null;
   if (file.diff.truncated) return 'truncated';
   if (file.diff.hunks.length === 0) return 'empty';
   return null;
@@ -246,6 +258,9 @@ export function buildRowModel(
       rows.push({ kind: 'notice', fileId, notice });
     } else if (file.diff === null) {
       rows.push({ kind: 'placeholder', fileId });
+    } else if (file.diff.binary) {
+      // `noticeFor` only lets a binary file through when it is an image.
+      rows.push({ kind: 'image', fileId });
     } else {
       if (file.diff.maxLineLength > maxLineLength) {
         maxLineLength = file.diff.maxLineLength;
@@ -485,9 +500,46 @@ export function rowKey(row: DocumentRow): string {
       return `n:${row.fileId}:${row.notice}`;
     case 'placeholder':
       return `p:${row.fileId}`;
+    case 'image':
+      return `i:${row.fileId}`;
     case 'spacer':
       return `s:${row.fileId}`;
   }
+}
+
+/** Breathing room above a revealed change, on top of the sticky file header. */
+export const SCROLL_MARGIN = 8;
+
+/**
+ * The least height of the end-of-document section: enough for its message and
+ * mascot, in a window tall enough that nothing else is needed.
+ */
+export const END_OF_DOCUMENT_MIN_HEIGHT = 220;
+
+/**
+ * How tall the space after the last file is.
+ *
+ * Revealing a change scrolls it to just under the sticky file header. Near the
+ * end of the document there used to be too little below to scroll that far, so
+ * the change stopped partway down the viewport and the sticky header went on
+ * naming the file above it. This space is what makes every change revealable:
+ * it is at least a viewport tall, less the header and margin a reveal leaves
+ * above its target, so even a change in the last row can reach that position.
+ *
+ * It sits outside the row model on purpose. It depends on the viewport's
+ * height, which the model does not know and should not be rebuilt for, and it
+ * is not part of any file — so offsets, the binary search and the navigation
+ * index are untouched. `DiffDocument` adds it to the canvas below
+ * `model.totalHeight`.
+ */
+export function endOfDocumentHeight(
+  viewportHeight: number,
+  metrics: RowMetrics,
+): number {
+  return Math.max(
+    END_OF_DOCUMENT_MIN_HEIGHT,
+    viewportHeight - metrics.fileHeaderHeight - SCROLL_MARGIN,
+  );
 }
 
 /**
@@ -523,12 +575,18 @@ export function anchorAt(model: RowModel, scrollTop: number): ScrollAnchor | nul
 
 /**
  * The `scrollTop` that puts an anchor back at the top of the viewport, or null
- * when its row is no longer in the model.
+ * when its file is no longer in the model.
  *
  * The search starts at the anchor's file header and stops at the next file,
  * so it costs one file's rows rather than the document's. The fraction is
  * applied to the row's new height, which keeps the same part of a wrapped
  * line in view as it grows or shrinks.
+ *
+ * When the row itself has gone but its file has not — a placeholder replaced
+ * by the diff it stood for, a collapsed file's lines, rows whose kind changed
+ * with the view mode — the file's header stands in. Staying in the right file
+ * is what matters; the offset would otherwise stay put while everything above
+ * it moved.
  */
 export function offsetOfAnchor(model: RowModel, anchor: ScrollAnchor): number | null {
   const start = model.fileRowIndex.get(anchor.fileId);
@@ -544,7 +602,7 @@ export function offsetOfAnchor(model: RowModel, anchor: ScrollAnchor): number | 
     return top + anchor.fraction * height;
   }
 
-  return null;
+  return model.offsets[start];
 }
 
 /**

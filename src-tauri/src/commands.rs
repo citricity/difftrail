@@ -104,3 +104,27 @@ pub fn get_file_contents(
 
     repository::file_contents(&root, &path, Side::parse(&side)?)
 }
+
+/// One side of a changed image, as raw bytes.
+///
+/// Returned as an `ipc::Response` so the bytes cross the boundary as a binary
+/// body — the webview receives an `ArrayBuffer` — rather than as a JSON array
+/// of numbers several times the size. The original side of a rename is read
+/// from the path it had before.
+#[tauri::command]
+pub fn get_image_bytes(
+    state: State<'_, AppState>,
+    path: String,
+    side: String,
+) -> AppResult<tauri::ipc::Response> {
+    let root = state.root()?;
+    let meta = state.file(&path)?;
+    let side = Side::parse(&side)?;
+
+    let source = match side {
+        Side::Original => meta.old_path.as_deref().unwrap_or(&meta.path),
+        Side::Working => &meta.path,
+    };
+
+    repository::image_bytes(&root, source, side).map(tauri::ipc::Response::new)
+}

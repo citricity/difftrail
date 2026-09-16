@@ -22,6 +22,16 @@ import type {
   Settings,
 } from '../types/index.ts';
 import { DEFAULT_SETTINGS, MAX_WRAP_LENGTH, MIN_WRAP_LENGTH } from '../types/index.ts';
+import iconAfter from './fixtureImages/icon-after.png';
+import iconBefore from './fixtureImages/icon-before.png';
+
+/**
+ * The sample's changed image, both sides. Real files served by Vite, fetched
+ * when asked for, rather than kilobytes of base64 in this module.
+ */
+const IMAGES: Record<string, { original: string; working: string }> = {
+  'assets/icon.png': { original: iconBefore, working: iconAfter },
+};
 
 /** Simulated backend latency, so loading states are visible in development. */
 const LATENCY_MS = 120;
@@ -349,6 +359,21 @@ async function resolveFixture(
         ),
       };
       return delay(settings);
+    }
+
+    case 'get_image_bytes': {
+      const path = typeof args?.path === 'string' ? args.path : '';
+      const side: FileSide = args?.side === 'original' ? 'original' : 'working';
+      const url = IMAGES[path]?.[side];
+      if (url === undefined) {
+        throw new AppError({
+          kind: 'binaryFile',
+          message: `${path} is not an image Diff Trail can show.`,
+          detail: null,
+        });
+      }
+      const bytes = await fetch(url).then((response) => response.arrayBuffer());
+      return delay(bytes);
     }
 
     case 'get_file_contents': {

@@ -108,6 +108,15 @@
   color: var(--text-muted);
 }
 
+/* The idle mascot, larger than the one at the end of a document: here it is the
+   whole of what the window has to show. Sized through the shared rule's
+   variable rather than by overriding it. */
+.emptyMascot {
+  --mascot-size: 168px;
+
+  margin-bottom: 10px;
+}
+
 .emptyTitle {
   color: var(--text);
   font-size: 13px;

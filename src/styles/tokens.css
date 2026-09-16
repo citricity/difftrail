@@ -25,6 +25,8 @@
   --expander-height: 24px;
   --notice-height: 44px;
   --placeholder-height: 44px;
+  /* A changed image's before-and-after row. The pictures scale down to fit. */
+  --image-row-height: 260px;
   --file-gap: 14px;
   --gutter-width: 108px;
   /* Clear space after the code on each line. Also read by auto wrapping,
@@ -51,6 +53,8 @@
 
   --accent: #0969da;
   --accent-soft: rgb(9 105 218 / 12%);
+  /* The mascot at the end of the document: the navy it was drawn in. */
+  --mascot: #3d5a8c;
 
   --diff-add-bg: #e6ffec;
   --diff-add-gutter: #ccffd8;
@@ -107,6 +111,8 @@
 
     --accent: #4493f8;
     --accent-soft: rgb(68 147 248 / 15%);
+    /* Lifted, or the navy all but disappears into the dark background. */
+    --mascot: #7896c8;
 
     --diff-add-bg: rgb(46 160 67 / 15%);
     --diff-add-gutter: rgb(46 160 67 / 30%);

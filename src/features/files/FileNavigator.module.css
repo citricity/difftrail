@@ -1,0 +1,168 @@
+/* Hangs from the sticky file header rather than sitting centred like Settings:
+   `inset: auto` undoes the modal dialog's centring, and the component places
+   it with `top`, `left` and `width`. */
+.dialog {
+  position: fixed;
+  inset: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow:
+    0 8px 24px rgb(0 0 0 / 16%),
+    0 2px 6px rgb(0 0 0 / 8%);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+/* A dropdown, not a modal moment: the document stays visible behind it. */
+.dialog::backdrop {
+  background: transparent;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(440px, 60vh);
+}
+
+.filter {
+  flex: 0 0 auto;
+  margin: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+.filter:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0 4px 4px;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.option {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+
+.highlighted {
+  background: var(--accent-soft);
+}
+
+/* The file you are in: marked on its own, so it still shows when the
+   highlight has moved elsewhere. */
+.current {
+  box-shadow: inset 2px 0 0 var(--active-outline);
+}
+
+.status {
+  flex: 0 0 14px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  text-align: center;
+}
+
+.status[data-status='added'] {
+  color: var(--diff-add-text);
+}
+
+.status[data-status='deleted'] {
+  color: var(--diff-remove-text);
+}
+
+/* Truncates like the file header: folders go before the name does. */
+.path {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  white-space: pre;
+}
+
+.directory {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+}
+
+.name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.match {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.counts {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: calc(var(--code-font-size) - 1px);
+}
+
+.additions {
+  color: var(--diff-add-text);
+}
+
+.deletions {
+  color: var(--diff-remove-text);
+}
+
+.empty {
+  margin: 4px 16px 12px;
+  color: var(--text-muted);
+}
+
+.hint {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+.hint kbd {
+  margin-right: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: inherit;
+}

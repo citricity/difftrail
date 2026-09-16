@@ -141,7 +141,9 @@ export function App() {
         metrics={metrics}
         loading={state.phase === 'starting'}
         current={navigation.current}
+        revealRequest={navigation.revealRequest}
         onSelect={navigation.goTo}
+        onSelectFile={navigation.goToFile}
         onVisibleFileChange={prefetchAround}
         onToggleCollapse={toggleCollapse}
         onLoadFully={handleLoadFully}

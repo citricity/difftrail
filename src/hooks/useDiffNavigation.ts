@@ -35,6 +35,18 @@ export interface DiffNavigation {
   goPrevious: () => void;
   /** Jump straight to a change, e.g. from a click in the document. */
   goTo: (location: ChangeLocation) => void;
+  /**
+   * Jump to a file, landing on its first change — loading the file first if
+   * need be — so that Next and Previous carry on from there.
+   */
+  goToFile: (fileId: string) => void;
+  /**
+   * Increments whenever the view must be brought to `current` even if
+   * `current` has not changed. Picking the file you are already on, after
+   * scrolling away from it, is a request to go back to it; without this the
+   * document would see the same location and, rightly, do nothing.
+   */
+  revealRequest: number;
 }
 
 export function useDiffNavigation(
@@ -43,6 +55,7 @@ export function useDiffNavigation(
 ): DiffNavigation {
   const [current, setCurrent] = useState<ChangeLocation | null>(null);
   const [navigating, setNavigating] = useState(false);
+  const [revealRequest, setRevealRequest] = useState(0);
 
   /**
    * Increments on every step. A load that finishes after the user has already
@@ -96,6 +109,49 @@ export function useDiffNavigation(
     setCurrent(location);
   }, []);
 
+  /**
+   * The file header lands first, immediately, and the first hunk follows when
+   * it is known. For a loaded file that is the same render; for one not yet
+   * read, the reader sees the jump happen at once and settle onto the change a
+   * moment later, rather than waiting on a load with nothing moving.
+   *
+   * A collapsed file has no hunk rows to land on, so its header is the
+   * destination — the same place its collapsed notice is.
+   */
+  const goToFile = useCallback(
+    (fileId: string) => {
+      const file = files.find((candidate) => candidate.meta.id === fileId);
+      if (file === undefined) return;
+
+      const ticket = (token.current += 1);
+      setRevealRequest((previous) => previous + 1);
+
+      const settled = file.status === 'loaded' || file.status === 'error';
+      if (file.collapsed || settled) {
+        const hunkId = file.collapsed
+          ? null
+          : entryHunk(file.diff?.hunks ?? [], 'next');
+        setNavigating(false);
+        setCurrent({ fileId, hunkId });
+        return;
+      }
+
+      setCurrent({ fileId, hunkId: null });
+      setNavigating(true);
+
+      void ensureLoaded(fileId)
+        .then((diff) => {
+          if (ticket !== token.current) return;
+          const hunkId = diff === null ? null : entryHunk(diff.hunks, 'next');
+          if (hunkId !== null) setCurrent({ fileId, hunkId });
+        })
+        .finally(() => {
+          if (ticket === token.current) setNavigating(false);
+        });
+    },
+    [ensureLoaded, files],
+  );
+
   const currentIndex = indexOfLocation(entries, current);
 
   return {
@@ -110,5 +166,7 @@ export function useDiffNavigation(
     goNext,
     goPrevious,
     goTo,
+    goToFile,
+    revealRequest,
   };
 }

@@ -18,6 +18,7 @@ const FALLBACK: RowMetrics = {
   expanderHeight: 24,
   noticeHeight: 44,
   placeholderHeight: 44,
+  imageHeight: 260,
   fileGap: 16,
   charWidth: 7.8,
   gutterWidth: 104,
@@ -80,6 +81,7 @@ export function useRowMetrics(): RowMetrics {
           '--placeholder-height',
           FALLBACK.placeholderHeight,
         ),
+        imageHeight: readPixels(styles, '--image-row-height', FALLBACK.imageHeight),
         fileGap: readPixels(styles, '--file-gap', FALLBACK.fileGap),
         charWidth: measureCharWidth(
           `${fontSize}px ${fontFamily}`,

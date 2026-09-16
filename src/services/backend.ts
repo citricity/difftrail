@@ -119,6 +119,21 @@ export async function onSettingsRequested(
   });
 }
 
+/**
+ * One side of a changed image, as bytes.
+ *
+ * The backend sends a raw binary body, which arrives as an `ArrayBuffer`. A
+ * transport that falls back to JSON delivers the same bytes as an array of
+ * numbers, so both are accepted.
+ */
+export async function getImageBytes(
+  path: string,
+  side: FileSide,
+): Promise<Uint8Array> {
+  const body = await call<ArrayBuffer | number[]>('get_image_bytes', { path, side });
+  return body instanceof ArrayBuffer ? new Uint8Array(body) : Uint8Array.from(body);
+}
+
 export function getSettings(): Promise<Settings> {
   return call<Settings>('get_settings');
 }
