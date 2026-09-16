@@ -9,10 +9,24 @@
  * reveal the result.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ReactElement } from 'react';
 import { useElementSize } from '../../hooks/useElementSize.ts';
-import { offsetOfTarget, rowKey, visibleRange } from '../../lib/rows.ts';
+import {
+  anchorAt,
+  lineAreaWidth,
+  offsetOfAnchor,
+  offsetOfTarget,
+  rowKey,
+  visibleRange,
+} from '../../lib/rows.ts';
 import type { RowMetrics, RowModel } from '../../lib/rows.ts';
 import { runsForContextLine, runsForLine } from '../../lib/rowRuns.ts';
 import type {
@@ -20,9 +34,13 @@ import type {
   DiffHunk,
   DocumentFile,
   LineRange,
+  ViewMode,
 } from '../../types/index.ts';
 import { DiffLineRow } from './DiffLineRow.tsx';
 import { ExpanderRow } from './ExpanderRow.tsx';
+import { PaneScrollbar } from './PaneScrollbar.tsx';
+import { SplitLineRow } from './SplitLineRow.tsx';
+import type { PaneLine } from './SplitLineRow.tsx';
 import { FileHeaderRow } from './FileHeaderRow.tsx';
 import { HunkHeaderRow } from './HunkHeaderRow.tsx';
 import { NoticeRow } from './NoticeRow.tsx';
@@ -49,6 +67,13 @@ interface Props {
   onExpandContext: (fileId: string, range: LineRange) => void;
   /** Column long lines wrap at, or null to scroll them horizontally. */
   wrapColumn: number | null;
+  viewMode: ViewMode;
+  /**
+   * Told the viewport's width whenever it changes, so auto wrapping can fit
+   * lines to it. Called as often as the size changes; any rate-limiting is the
+   * receiver's business.
+   */
+  onViewportWidthChange?: (width: number) => void;
 }
 
 export function DiffDocument({
@@ -63,10 +88,51 @@ export function DiffDocument({
   onLoadFully,
   onExpandContext,
   wrapColumn,
+  viewMode,
+  onViewportWidthChange,
 }: Props) {
-  const viewportRef = useRef<HTMLDivElement>(null);
+  /**
+   * The scrolling element, held twice on purpose.
+   *
+   * `useElementSize` has to re-run when the element appears, and it does not
+   * appear on the first render — the loading state is shown until the file list
+   * arrives — so the measurement needs it as state. Setting `scrollTop` is a
+   * mutation, which belongs on a ref rather than on a value captured from
+   * render scope.
+   */
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
+
+  const attachViewport = useCallback((node: HTMLDivElement | null) => {
+    viewportRef.current = node;
+    setViewport(node);
+  }, []);
+
   const [scrollTop, setScrollTop] = useState(0);
-  const { height: measuredHeight, width: viewportWidth } = useElementSize(viewportRef);
+  /**
+   * The viewport's scroll position as of the last scroll event, updated
+   * synchronously rather than once a frame like `scrollTop`.
+   *
+   * Anchoring across a rebuild has to know where the reader was *before* the
+   * new model was committed. By the time a layout effect runs, the canvas has
+   * already taken its new height, and if that is shorter the browser may have
+   * clamped the element's own `scrollTop` — so it cannot be asked.
+   */
+  const liveScrollTop = useRef(0);
+  /**
+   * How far the split view's panes are scrolled sideways.
+   *
+   * Only the split view needs this. The unified view's viewport scrolls
+   * horizontally itself, but two panes cannot share one scroller without
+   * scrolling out of step, so here the offset is state and the panes translate.
+   */
+  const [paneOffset, setPaneOffset] = useState(0);
+  const split = viewMode === 'split';
+  const { height: measuredHeight, width: viewportWidth } = useElementSize(viewport);
+
+  useEffect(() => {
+    if (viewportWidth > 0) onViewportWidthChange?.(viewportWidth);
+  }, [viewportWidth, onViewportWidthChange]);
 
   /**
    * A measured height of zero would render overscan and nothing else, which
@@ -98,6 +164,7 @@ export function DiffDocument({
   // per frame keeps a fast flick from queueing dozens of renders.
   const frame = useRef<number | null>(null);
   const handleScroll = useCallback(() => {
+    liveScrollTop.current = viewportRef.current?.scrollTop ?? 0;
     if (frame.current !== null) return;
 
     frame.current = requestAnimationFrame(() => {
@@ -127,8 +194,8 @@ export function DiffDocument({
   const lastRevealed = useRef<string | null>(null);
 
   useEffect(() => {
-    const viewport = viewportRef.current;
-    if (viewport === null || current === null) return;
+    const element = viewportRef.current;
+    if (element === null || current === null) return;
 
     const key = `${current.fileId}|${current.hunkId ?? ''}`;
     if (lastRevealed.current === key) return;
@@ -138,12 +205,49 @@ export function DiffDocument({
 
     lastRevealed.current = key;
     // Clear the sticky file header as well, or the change lands underneath it.
-    viewport.scrollTop = Math.max(
-      0,
-      offset - metrics.fileHeaderHeight - SCROLL_MARGIN,
-    );
-    setScrollTop(viewport.scrollTop);
-  }, [current, model, metrics.fileHeaderHeight]);
+    element.scrollTop = Math.max(0, offset - metrics.fileHeaderHeight - SCROLL_MARGIN);
+    liveScrollTop.current = element.scrollTop;
+    setScrollTop(element.scrollTop);
+  }, [current, model, metrics.fileHeaderHeight, viewport]);
+
+  /**
+   * Keeps the reader's place when the wrap column changes.
+   *
+   * A new column changes the height of every wrapped line, including all the
+   * ones above the viewport, so an unchanged `scrollTop` would show a different
+   * part of the document — and in auto mode that happens continuously while
+   * the window is resized. So the row at the top of the viewport is found in
+   * the model being replaced and put back at the top in the new one.
+   *
+   * A layout effect, so the correction lands before paint and the jump is
+   * never seen. Limited to column changes: other rebuilds (a diff arriving, a
+   * file collapsing) have their own expectations about where the view goes.
+   */
+  const previousLayout = useRef({ model, wrapColumn });
+
+  useLayoutEffect(() => {
+    const before = previousLayout.current;
+    previousLayout.current = { model, wrapColumn };
+
+    const element = viewportRef.current;
+    if (
+      element === null ||
+      before.model === model ||
+      before.wrapColumn === wrapColumn
+    ) {
+      return;
+    }
+
+    const anchor = anchorAt(before.model, liveScrollTop.current);
+    if (anchor === null) return;
+
+    const restored = offsetOfAnchor(model, anchor);
+    if (restored === null) return;
+
+    element.scrollTop = restored;
+    liveScrollTop.current = element.scrollTop;
+    setScrollTop(element.scrollTop);
+  }, [model, wrapColumn]);
 
   // Let the loader know which part of the document is being read, so it can
   // fetch the neighbouring diffs before they are scrolled into view.
@@ -158,9 +262,38 @@ export function DiffDocument({
   }, [visibleFile, onVisibleFileChange]);
 
   const range = visibleRange(model, scrollTop, viewportHeight, OVERSCAN);
-  const canvasWidth = Math.max(model.contentWidth, viewportWidth);
 
-  const stickyFile = visibleFile === null ? null : fileById.get(visibleFile) ?? null;
+  // A pane is half the viewport less the divider; in the unified view the
+  // canvas is as wide as the content and the viewport scrolls over it.
+  const paneWidth = lineAreaWidth(viewportWidth, 'split');
+  const paneOverflow = Math.max(0, model.contentWidth - paneWidth);
+  const canvasWidth = split
+    ? viewportWidth
+    : Math.max(model.contentWidth, viewportWidth);
+
+  // Clamp on every render rather than only when panning: narrowing the window
+  // or turning wrapping on can leave the offset past the end.
+  const offset = Math.min(paneOffset, paneOverflow);
+
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (!split) return;
+
+      // Trackpads report sideways scrolling as deltaX; a mouse wheel with
+      // shift held reports it as deltaY, and both should pan the panes.
+      const sideways = event.shiftKey ? event.deltaY : event.deltaX;
+      if (sideways === 0 || Math.abs(sideways) < Math.abs(event.deltaY) * 0.5) {
+        if (!event.shiftKey) return;
+      }
+
+      setPaneOffset((previous) =>
+        Math.min(paneOverflow, Math.max(0, previous + sideways)),
+      );
+    },
+    [paneOverflow, split],
+  );
+
+  const stickyFile = visibleFile === null ? null : (fileById.get(visibleFile) ?? null);
 
   // Two layers: rows that scroll with the canvas on both axes, and the
   // full-width bars, which stay put horizontally (see `.pinned`).
@@ -204,6 +337,29 @@ export function DiffDocument({
         break;
       }
 
+      case 'split-line': {
+        const hunk = hunkById.get(row.hunkId);
+        if (hunk === undefined) break;
+
+        const pane = (index: number | null): PaneLine | null =>
+          index === null
+            ? null
+            : { line: hunk.lines[index], runs: runsForLine(hunk, index) };
+
+        rendered.push(
+          <SplitLineRow
+            key={key}
+            style={style}
+            left={pane(row.left)}
+            right={pane(row.right)}
+            wrapColumn={wrapColumn}
+            offset={offset}
+            active={current?.hunkId === hunk.id}
+          />,
+        );
+        break;
+      }
+
       case 'line': {
         const hunk = hunkById.get(row.hunkId);
         const line = hunk?.lines[row.lineIndex];
@@ -239,21 +395,38 @@ export function DiffDocument({
         const text = file.text;
         if (text === null) break;
 
+        const line = {
+          kind: 'context' as const,
+          content: text.working?.[row.lineNumber - 1] ?? '',
+          oldLineNumber: row.oldLineNumber,
+          newLineNumber: row.lineNumber,
+          noNewline: false,
+        };
+        const runs = runsForContextLine(text, row.lineNumber);
+
+        // Unchanged context exists on both sides, so in the split view it
+        // shows on both — with each pane's own line number.
         rendered.push(
-          <DiffLineRow
-            key={key}
-            style={style}
-            line={{
-              kind: 'context',
-              content: text.working?.[row.lineNumber - 1] ?? '',
-              oldLineNumber: row.oldLineNumber,
-              newLineNumber: row.lineNumber,
-              noNewline: false,
-            }}
-            runs={runsForContextLine(text, row.lineNumber)}
-            wrapColumn={wrapColumn}
-            active={false}
-          />,
+          split ? (
+            <SplitLineRow
+              key={key}
+              style={style}
+              left={{ line, runs }}
+              right={{ line, runs }}
+              wrapColumn={wrapColumn}
+              offset={offset}
+              active={false}
+            />
+          ) : (
+            <DiffLineRow
+              key={key}
+              style={style}
+              line={line}
+              runs={runs}
+              wrapColumn={wrapColumn}
+              active={false}
+            />
+          ),
         );
         break;
       }
@@ -309,9 +482,12 @@ export function DiffDocument({
   return (
     <div className={styles.container}>
       <div
-        ref={viewportRef}
-        className={styles.viewport}
+        ref={attachViewport}
+        className={
+          split ? `${styles.viewport} ${styles.viewportSplit}` : styles.viewport
+        }
         onScroll={handleScroll}
+        onWheel={handleWheel}
         tabIndex={0}
         role="region"
         aria-label="Repository diff"
@@ -330,6 +506,15 @@ export function DiffDocument({
           </div>
         </div>
       </div>
+
+      {split && (
+        <PaneScrollbar
+          contentWidth={model.contentWidth}
+          visibleWidth={paneWidth}
+          offset={offset}
+          onScroll={setPaneOffset}
+        />
+      )}
 
       {stickyFile !== null && (
         <div className={styles.stickyFile}>

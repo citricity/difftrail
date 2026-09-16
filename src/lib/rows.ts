@@ -7,8 +7,9 @@
  *
  * Row heights are known up front — a diff line is exactly one line tall, and
  * headers and notices have fixed heights — so offsets are exact and
- * scroll-to-hunk needs no measurement, no guessing and no reflow. Rows never
- * wrap: long lines scroll horizontally instead (see `contentWidth`).
+ * scroll-to-hunk needs no measurement, no guessing and no reflow. A wrapped
+ * line is still exact: it is a whole number of rows tall (see `lib/wrap.ts`).
+ * Unwrapped, long lines scroll horizontally instead (see `contentWidth`).
  *
  * Only loaded files expand into line rows. An unloaded file is a single
  * placeholder row, and a diff the backend declined to parse (too large,
@@ -16,7 +17,8 @@
  * even in a repository with a very large change set.
  */
 
-import type { DiffHunk, DocumentFile, LineRange } from '../types/index.ts';
+import type { DiffHunk, DocumentFile, LineRange, ViewMode } from '../types/index.ts';
+import { pairHunkLines } from './pairing.ts';
 import { splitGap } from './ranges.ts';
 import { wrapCount } from './wrap.ts';
 
@@ -45,6 +47,18 @@ export type DocumentRow =
       above: boolean;
       below: boolean;
     }
+  /**
+   * One row of the split view: an original-side line, a working-side line, or
+   * both. Either may be null, which renders as a blank facing the other.
+   */
+  | {
+      kind: 'split-line';
+      fileId: string;
+      hunkId: string;
+      left: number | null;
+      right: number | null;
+      rows: number;
+    }
   /** A line of unchanged context the reader expanded into view. */
   | {
       kind: 'context';
@@ -70,6 +84,68 @@ export interface RowMetrics {
   charWidth: number;
   /** Width of the line-number gutter. */
   gutterWidth: number;
+  /** Space kept clear after the code on each line, before the edge. */
+  contentPadding: number;
+}
+
+/** Width of the rule between the split view's panes, in pixels. Matches the CSS. */
+export const PANE_DIVIDER_WIDTH = 1;
+
+/**
+ * How wide one line's column is: the whole viewport in the unified view, one
+ * pane in the split view. Both panes are always the same width.
+ */
+export function lineAreaWidth(viewportWidth: number, viewMode: ViewMode): number {
+  return viewMode === 'split'
+    ? Math.max(0, (viewportWidth - PANE_DIVIDER_WIDTH) / 2)
+    : Math.max(0, viewportWidth);
+}
+
+/**
+ * The narrowest column auto wrapping will choose.
+ *
+ * Below this a squeezed window turns every line into a tower of fragments that
+ * is harder to read than scrolling, so the lines stop getting narrower and
+ * horizontal scrolling takes over the rest.
+ */
+export const MIN_AUTO_WRAP_COLUMN = 20;
+
+/**
+ * Columns held back from the edge in auto mode.
+ *
+ * Lengths are UTF-16 code units, so a line holding wide glyphs or astral
+ * characters is a little wider than its length says. With a fixed column
+ * nobody notices; wrapping at the edge promises the text fits, and without
+ * this slack such a line would lose its last character or so to the clip.
+ */
+export const AUTO_WRAP_MARGIN = 1;
+
+/**
+ * The column that fits a line's code into the viewport, for `auto` wrapping.
+ *
+ * The code font is monospaced, so this is arithmetic like every other wrap:
+ * the line's width, less its gutter and trailing padding, in whole characters.
+ * In the split view the width is one pane's, and both panes share the result.
+ *
+ * Null until the viewport has been measured, which the caller turns into a
+ * fallback rather than laying the document out for a width of zero.
+ */
+export function autoWrapColumn(
+  viewportWidth: number,
+  metrics: RowMetrics,
+  viewMode: ViewMode,
+): number | null {
+  if (viewportWidth <= 0 || metrics.charWidth <= 0) return null;
+
+  const codeWidth =
+    lineAreaWidth(viewportWidth, viewMode) -
+    metrics.gutterWidth -
+    metrics.contentPadding;
+
+  return Math.max(
+    MIN_AUTO_WRAP_COLUMN,
+    Math.floor(codeWidth / metrics.charWidth) - AUTO_WRAP_MARGIN,
+  );
 }
 
 export interface RowModel {
@@ -92,6 +168,7 @@ function heightOf(row: DocumentRow, metrics: RowMetrics): number {
     case 'hunk-header':
       return metrics.lineHeight;
     case 'line':
+    case 'split-line':
     case 'context':
       return metrics.lineHeight * row.rows;
     case 'expander':
@@ -149,7 +226,9 @@ export function buildRowModel(
   files: DocumentFile[],
   metrics: RowMetrics,
   wrapColumn: number | null = null,
+  viewMode: ViewMode = 'unified',
 ): RowModel {
+  const split = viewMode === 'split';
   const rows: DocumentRow[] = [];
   const fileRowIndex = new Map<string, number>();
   const hunkRowIndex = new Map<string, number>();
@@ -229,14 +308,39 @@ export function buildRowModel(
         hunkRowIndex.set(hunk.id, rows.length);
         rows.push({ kind: 'hunk-header', fileId, hunkId: hunk.id });
 
-        for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
-          rows.push({
-            kind: 'line',
-            fileId,
-            hunkId: hunk.id,
-            lineIndex,
-            rows: wrapCount(hunk.lines[lineIndex].content.length, wrapColumn),
-          });
+        if (split) {
+          // A split row is as tall as its taller side: the two panes share a
+          // baseline, so a line that wraps on one side pushes the other's
+          // blank space down with it.
+          for (const pair of pairHunkLines(hunk)) {
+            const height = Math.max(
+              pair.left === null
+                ? 1
+                : wrapCount(hunk.lines[pair.left].content.length, wrapColumn),
+              pair.right === null
+                ? 1
+                : wrapCount(hunk.lines[pair.right].content.length, wrapColumn),
+            );
+
+            rows.push({
+              kind: 'split-line',
+              fileId,
+              hunkId: hunk.id,
+              left: pair.left,
+              right: pair.right,
+              rows: height,
+            });
+          }
+        } else {
+          for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
+            rows.push({
+              kind: 'line',
+              fileId,
+              hunkId: hunk.id,
+              lineIndex,
+              rows: wrapCount(hunk.lines[lineIndex].content.length, wrapColumn),
+            });
+          }
         }
 
         const next = hunks[index + 1];
@@ -371,6 +475,8 @@ export function rowKey(row: DocumentRow): string {
       return `h:${row.hunkId}`;
     case 'line':
       return `l:${row.hunkId}:${row.lineIndex}`;
+    case 'split-line':
+      return `s:${row.hunkId}:${row.left ?? 'x'}:${row.right ?? 'x'}`;
     case 'expander':
       return `x:${row.fileId}:${row.range.start}`;
     case 'context':
@@ -382,6 +488,63 @@ export function rowKey(row: DocumentRow): string {
     case 'spacer':
       return `s:${row.fileId}`;
   }
+}
+
+/**
+ * Where the reader is, in terms that survive a rebuild of the model.
+ *
+ * An offset does not: when the wrap column changes, every wrapped line above
+ * the viewport changes height, so the same `scrollTop` lands somewhere else
+ * entirely. So the position is recorded as the row at the top of the viewport
+ * — by key, which does not depend on index or height — and how far down that
+ * row the top edge was.
+ */
+export interface ScrollAnchor {
+  key: string;
+  fileId: string;
+  /** 0 at the row's top edge, approaching 1 at its bottom. */
+  fraction: number;
+}
+
+export function anchorAt(model: RowModel, scrollTop: number): ScrollAnchor | null {
+  if (model.rows.length === 0) return null;
+
+  const index = rowAtOffset(model, scrollTop);
+  const row = model.rows[index];
+  const top = model.offsets[index];
+  const height = model.offsets[index + 1] - top;
+
+  return {
+    key: rowKey(row),
+    fileId: row.fileId,
+    fraction: height > 0 ? Math.min(1, Math.max(0, (scrollTop - top) / height)) : 0,
+  };
+}
+
+/**
+ * The `scrollTop` that puts an anchor back at the top of the viewport, or null
+ * when its row is no longer in the model.
+ *
+ * The search starts at the anchor's file header and stops at the next file,
+ * so it costs one file's rows rather than the document's. The fraction is
+ * applied to the row's new height, which keeps the same part of a wrapped
+ * line in view as it grows or shrinks.
+ */
+export function offsetOfAnchor(model: RowModel, anchor: ScrollAnchor): number | null {
+  const start = model.fileRowIndex.get(anchor.fileId);
+  if (start === undefined) return null;
+
+  for (let index = start; index < model.rows.length; index += 1) {
+    const row = model.rows[index];
+    if (row.fileId !== anchor.fileId) break;
+    if (rowKey(row) !== anchor.key) continue;
+
+    const top = model.offsets[index];
+    const height = model.offsets[index + 1] - top;
+    return top + anchor.fraction * height;
+  }
+
+  return null;
 }
 
 /**

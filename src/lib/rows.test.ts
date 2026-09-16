@@ -8,8 +8,13 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  AUTO_WRAP_MARGIN,
+  MIN_AUTO_WRAP_COLUMN,
+  anchorAt,
+  autoWrapColumn,
   buildRowModel,
   fileAtOffset,
+  offsetOfAnchor,
   offsetOfTarget,
   rowAtOffset,
   rowKey,
@@ -35,6 +40,7 @@ const METRICS: RowMetrics = {
   fileGap: 10,
   charWidth: 8,
   gutterWidth: 100,
+  contentPadding: 16,
 };
 
 function fileWith(path: string, overrides: Partial<DocumentFile>): DocumentFile {
@@ -481,5 +487,197 @@ describe('wrapping', () => {
     expect(model.contentWidth).toBeLessThan(
       METRICS.gutterWidth + 120 * METRICS.charWidth,
     );
+  });
+});
+
+describe('the split view', () => {
+  function replacement(): DocumentFile {
+    const hunk = makeHunk('a.ts', 0, [
+      makeLine('context', 'before', { old: 1, new: 1 }),
+      makeLine('delete', 'was one', { old: 2 }),
+      makeLine('delete', 'was two', { old: 3 }),
+      makeLine('add', 'is one', { new: 2 }),
+      makeLine('context', 'after', { old: 4, new: 3 }),
+    ]);
+
+    return {
+      ...loadedFile('a.ts', 1),
+      diff: { ...makeDiff('a.ts', 1), hunks: [hunk] },
+    };
+  }
+
+  it('leaves the unified view alone', () => {
+    const model = buildRowModel([replacement()], METRICS);
+    expect(model.rows.filter((row) => row.kind === 'split-line')).toHaveLength(0);
+    expect(model.rows.filter((row) => row.kind === 'line')).toHaveLength(5);
+  });
+
+  it('turns five unified lines into four split rows', () => {
+    // Two deletions against one addition is three rows, not four: the extra
+    // deletion faces a blank rather than a line of its own.
+    const model = buildRowModel([replacement()], METRICS, null, 'split');
+    const split = model.rows.filter((row) => row.kind === 'split-line');
+
+    expect(split.map((row) => [row.left, row.right])).toEqual([
+      [0, 0],
+      [1, 3],
+      [2, null],
+      [4, 4],
+    ]);
+  });
+
+  it('keeps the hunk header and file header spanning both panes', () => {
+    const model = buildRowModel([replacement()], METRICS, null, 'split');
+    expect(model.rows.map((row) => row.kind)).toEqual([
+      'file-header',
+      'hunk-header',
+      'split-line',
+      'split-line',
+      'split-line',
+      'split-line',
+      'spacer',
+    ]);
+  });
+
+  it('makes a row as tall as its taller side', () => {
+    const long = 'x'.repeat(250);
+    const hunk = makeHunk('a.ts', 0, [
+      makeLine('delete', 'short', { old: 1 }),
+      makeLine('add', long, { new: 1 }),
+    ]);
+    const file = {
+      ...loadedFile('a.ts', 1),
+      diff: { ...makeDiff('a.ts', 1), hunks: [hunk], maxLineLength: long.length },
+    };
+
+    const model = buildRowModel([file], METRICS, 120, 'split');
+    const row = model.rows.find((r) => r.kind === 'split-line');
+
+    // The addition wraps to three; the deletion is one. The pair is three.
+    expect(row && row.kind === 'split-line' && row.rows).toBe(3);
+  });
+
+  it('still gives every row a distinct key', () => {
+    const model = buildRowModel([replacement()], METRICS, null, 'split');
+    const keys = model.rows.map(rowKey);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('keeps offsets exact across split rows', () => {
+    const model = buildRowModel([replacement()], METRICS, null, 'split');
+    let expected = 0;
+    model.rows.forEach((row, index) => {
+      expect(model.offsets[index]).toBe(expected);
+      expected +=
+        row.kind === 'split-line'
+          ? METRICS.lineHeight * row.rows
+          : row.kind === 'hunk-header'
+            ? METRICS.lineHeight
+            : row.kind === 'file-header'
+              ? METRICS.fileHeaderHeight
+              : METRICS.fileGap;
+    });
+    expect(model.totalHeight).toBe(expected);
+  });
+});
+
+/** A 250-character line with a short line after it, so wrapping moves the latter. */
+function fileWithLongLineAbove(): DocumentFile {
+  const long = 'x'.repeat(250);
+  const hunk = makeHunk('a.ts', 0, [
+    makeLine('add', long, { new: 1 }),
+    makeLine('context', 'after', { old: 1, new: 2 }),
+  ]);
+
+  return {
+    ...loadedFile('a.ts', 1),
+    diff: { ...makeDiff('a.ts', 1), hunks: [hunk], maxLineLength: long.length },
+  };
+}
+
+function indexOfKey(model: ReturnType<typeof buildRowModel>, key: string): number {
+  return model.rows.findIndex((row) => rowKey(row) === key);
+}
+
+describe('autoWrapColumn', () => {
+  it('fits the code into what the line has left after its gutter and padding', () => {
+    // 100 gutter + 16 padding leaves 800px, which is 100 characters at 8px.
+    const width = METRICS.gutterWidth + METRICS.contentPadding + 800;
+    expect(autoWrapColumn(width, METRICS, 'unified')).toBe(100 - AUTO_WRAP_MARGIN);
+  });
+
+  it('rounds down, so a partly visible character wraps rather than clipping', () => {
+    const width = METRICS.gutterWidth + METRICS.contentPadding + 807;
+    expect(autoWrapColumn(width, METRICS, 'unified')).toBe(100 - AUTO_WRAP_MARGIN);
+  });
+
+  it('fits one pane in the split view, less the divider between them', () => {
+    const pane = METRICS.gutterWidth + METRICS.contentPadding + 400;
+    const viewport = pane * 2 + 1;
+    expect(autoWrapColumn(viewport, METRICS, 'split')).toBe(50 - AUTO_WRAP_MARGIN);
+  });
+
+  it('never goes below the minimum in a very narrow window', () => {
+    expect(autoWrapColumn(150, METRICS, 'unified')).toBe(MIN_AUTO_WRAP_COLUMN);
+    expect(autoWrapColumn(150, METRICS, 'split')).toBe(MIN_AUTO_WRAP_COLUMN);
+  });
+
+  it('has no answer before the viewport has been measured', () => {
+    expect(autoWrapColumn(0, METRICS, 'unified')).toBeNull();
+  });
+
+  it('lays out a document that needs no horizontal scrolling', () => {
+    const viewport = 700;
+    const column = autoWrapColumn(viewport, METRICS, 'unified');
+    const model = buildRowModel([fileWithLongLineAbove()], METRICS, column);
+
+    expect(model.contentWidth + METRICS.contentPadding).toBeLessThanOrEqual(viewport);
+  });
+});
+
+describe('scroll anchoring', () => {
+  it('puts the same row back at the top when the wrap column changes', () => {
+    const narrow = buildRowModel([fileWithLongLineAbove()], METRICS, 50);
+    const wide = buildRowModel([fileWithLongLineAbove()], METRICS, 125);
+
+    const after = narrow.rows.findIndex((row) => row.kind === 'line' && row.rows === 1);
+    const scrollTop = narrow.offsets[after];
+
+    const anchor = anchorAt(narrow, scrollTop);
+    if (anchor === null) throw new Error('expected an anchor');
+
+    // The long line above is five rows at 50 and two at 125, so the row after
+    // it sits three rows higher in the wide model — and the anchor follows.
+    const restored = offsetOfAnchor(wide, anchor);
+    expect(restored).toBe(wide.offsets[indexOfKey(wide, anchor.key)]);
+    expect(restored).toBe(scrollTop - METRICS.lineHeight * 3);
+  });
+
+  it('keeps the same part of a wrapped line in view as it changes height', () => {
+    const narrow = buildRowModel([fileWithLongLineAbove()], METRICS, 50);
+    const wide = buildRowModel([fileWithLongLineAbove()], METRICS, 125);
+
+    const index = narrow.rows.findIndex((row) => row.kind === 'line' && row.rows === 5);
+    const anchor = anchorAt(narrow, narrow.offsets[index] + METRICS.lineHeight * 2.5);
+    if (anchor === null) throw new Error('expected an anchor');
+
+    expect(anchor.fraction).toBeCloseTo(0.5);
+    // Halfway down a line two rows tall is one row in.
+    expect(offsetOfAnchor(wide, anchor)).toBeCloseTo(
+      wide.offsets[indexOfKey(wide, anchor.key)] + METRICS.lineHeight,
+    );
+  });
+
+  it('gives up when the anchored row is no longer in the model', () => {
+    const model = buildRowModel([fileWithLongLineAbove()], METRICS, 120);
+    const anchor = anchorAt(model, model.offsets[2]);
+    if (anchor === null) throw new Error('expected an anchor');
+
+    const other = buildRowModel([loadedFile('elsewhere.ts', 1)], METRICS, 120);
+    expect(offsetOfAnchor(other, anchor)).toBeNull();
+  });
+
+  it('has nothing to anchor to in an empty document', () => {
+    expect(anchorAt(buildRowModel([], METRICS), 0)).toBeNull();
   });
 });

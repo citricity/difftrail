@@ -16,7 +16,7 @@ export type {
 
 export type { LaunchOptions } from './launch.ts';
 
-export type { Settings } from './settings.ts';
+export type { Settings, ViewMode, WrapMode } from './settings.ts';
 export {
   DEFAULT_SETTINGS,
   MAX_WRAP_LENGTH,

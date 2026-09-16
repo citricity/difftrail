@@ -21,6 +21,7 @@ const FALLBACK: RowMetrics = {
   fileGap: 16,
   charWidth: 7.8,
   gutterWidth: 104,
+  contentPadding: 16,
 };
 
 /** Reads a CSS custom property from the document root as a number of pixels. */
@@ -85,6 +86,11 @@ export function useRowMetrics(): RowMetrics {
           FALLBACK.charWidth,
         ),
         gutterWidth: readPixels(styles, '--gutter-width', FALLBACK.gutterWidth),
+        contentPadding: readPixels(
+          styles,
+          '--content-padding',
+          FALLBACK.contentPadding,
+        ),
       });
     };
 

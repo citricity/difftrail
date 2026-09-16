@@ -53,7 +53,7 @@ function DiffLineRowImpl({ line, runs, wrapColumn, active, style }: Props) {
   const wrapped = wrapRuns(runs, wrapColumn);
 
   return (
-    <div className={className} style={style} role="row">
+    <div className={className} style={style} role="row" data-row="line">
       {wrapped.map((rowRuns, index) => (
         <span key={index} className={styles.visualLine}>
           <span className={styles.gutter} aria-hidden="true">

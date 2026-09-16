@@ -28,8 +28,9 @@ pub const SETTINGS_EVENT: &str = "settings-requested";
 
 #[cfg(target_os = "macos")]
 pub fn install_settings<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+    // `menu()` is inherent on `AppHandle`, not a `Manager` method, so no trait
+    // needs importing here — unlike `commands.rs`, which uses `Manager::path`.
     use tauri::menu::{MenuItem, MenuItemKind, PredefinedMenuItem};
-    use tauri::Manager;
 
     // The first submenu is the application menu on macOS. If there is no menu
     // at all — a default Tauri stopped applying, say — there is nothing to add

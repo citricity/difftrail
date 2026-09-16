@@ -49,7 +49,18 @@
   height: 100%;
   color: var(--text-faint);
   text-align: right;
-  background: inherit;
+  /* Opaque, because code slides underneath it when a long line is scrolled
+     sideways. `inherit` cannot provide that: the parent is the transparent
+     visual-line wrapper, and in dark mode the diff tints are translucent
+     anyway. So the row's whole background is rebuilt here as layers over the
+     page colour — gutter tint, active highlight, line tint — each one set as
+     a custom property by the row or pane that owns it, which inherits the
+     same way in the unified and the split view. */
+  background:
+    linear-gradient(var(--gutter-tint, transparent), var(--gutter-tint, transparent)),
+    linear-gradient(var(--active-tint, transparent), var(--active-tint, transparent)),
+    linear-gradient(var(--line-tint, transparent), var(--line-tint, transparent)),
+    var(--bg);
   -webkit-user-select: none;
   user-select: none;
 }
@@ -68,10 +79,13 @@
 
 .content {
   flex: 1 1 auto;
-  padding-right: 16px;
+  padding-right: var(--content-padding);
 }
 
 .add {
+  --line-tint: var(--diff-add-bg);
+  --gutter-tint: var(--diff-add-gutter);
+
   background: var(--diff-add-bg);
 }
 
@@ -80,11 +94,13 @@
 }
 
 .add .gutter {
-  background: var(--diff-add-gutter);
   color: var(--diff-add-text);
 }
 
 .delete {
+  --line-tint: var(--diff-remove-bg);
+  --gutter-tint: var(--diff-remove-gutter);
+
   background: var(--diff-remove-bg);
 }
 
@@ -93,7 +109,6 @@
 }
 
 .delete .gutter {
-  background: var(--diff-remove-gutter);
   color: var(--diff-remove-text);
 }
 
@@ -127,6 +142,50 @@
   font-style: italic;
 }
 
+/* ---- Split view ------------------------------------------------------ */
+
+/* Two panes sharing a baseline. The row takes its height from the taller of
+   them, which is why neither pane sets one: a line that wraps on one side has
+   to push the other side's blank space down with it. */
+.splitRow {
+  align-items: stretch;
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  line-height: var(--row-height);
+  white-space: pre;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* A pane clips rather than scrolls — see `PaneScrollbar` for why. */
+.pane {
+  display: flex;
+  flex: 1 1 50%;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* No line here to face the other side. Distinct from an empty line, which is
+   a real line that happens to have no text on it. */
+.paneAbsent {
+  background: var(--surface-sunken);
+  opacity: 0.55;
+}
+
+.paneContent {
+  flex: 1 1 auto;
+  padding-right: var(--content-padding);
+  will-change: transform;
+}
+
+.paneDivider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
 /* ---- Hunk header ---------------------------------------------------- */
 
 .hunk {
@@ -155,6 +214,8 @@
 
 /* The change the global navigation cursor is currently on. */
 .active {
+  --active-tint: var(--active-bg);
+
   background: var(--active-bg);
   box-shadow: inset 2px 0 0 var(--active-outline);
 }

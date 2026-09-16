@@ -117,15 +117,30 @@ const DIFFS: Record<string, FileDiff> = {
         line('context', '  const [scrollTop, setScrollTop] = useState(0);', 18, 18),
         line('context', '', 19, 19),
         line('delete', '  const rows = buildRowModel(files);', 20, null),
-        line('add', '  const rows = useMemo(() => buildRowModel(files, metrics), [files, metrics]);', null, 20),
+        line(
+          'add',
+          '  const rows = useMemo(() => buildRowModel(files, metrics), [files, metrics]);',
+          null,
+          20,
+        ),
         line('context', '', 21, 21),
         line('context', '  return (', 22, 22),
       ]),
       hunk('src/features/diff/DiffDocument.tsx', 1, 64, 'function DiffDocument()', [
         line('context', '      {visible.map((row) => (', 64, 64),
         line('delete', '        <DiffRow key={row.id} row={row} />', 65, null),
-        line('add', '        <DiffRow key={row.id} row={row} active={row.hunkId === activeHunk} />', null, 65),
-        line('add', '        // highlight follows the global navigation cursor', null, 66),
+        line(
+          'add',
+          '        <DiffRow key={row.id} row={row} active={row.hunkId === activeHunk} />',
+          null,
+          65,
+        ),
+        line(
+          'add',
+          '        // highlight follows the global navigation cursor',
+          null,
+          66,
+        ),
         line('add', '', null, 67),
         line('context', '      ))}', 66, 68),
       ]),
@@ -146,7 +161,12 @@ const DIFFS: Record<string, FileDiff> = {
         line('context', 'export function buildNavigationIndex(files) {', 31, 31),
         line('delete', '  return files.flatMap((file) => file.hunks);', 32, null),
         line('add', '  return files.flatMap((file) =>', null, 32),
-        line('add', '    file.loaded ? file.hunks : [{ kind: "file", id: file.id }],', null, 33),
+        line(
+          'add',
+          '    file.loaded ? file.hunks : [{ kind: "file", id: file.id }],',
+          null,
+          33,
+        ),
         line('add', '  );', null, 34),
         line('context', '}', 33, 35),
       ]),
@@ -244,10 +264,7 @@ function sideFor(diff: FileDiff, side: FileSide): string[] | null {
   const wanted = side === 'original' ? 'oldLineNumber' : 'newLineNumber';
   const length = side === 'original' ? lengths.original : lengths.working;
 
-  const lines = Array.from(
-    { length },
-    (_, index) => FILLER[index % FILLER.length],
-  );
+  const lines = Array.from({ length }, (_, index) => FILLER[index % FILLER.length]);
 
   for (const hunk of diff.hunks) {
     for (const line of hunk.lines) {
@@ -310,7 +327,20 @@ async function resolveFixture(
     case 'set_settings': {
       const requested = (args?.settings ?? {}) as Partial<Settings>;
       settings = {
-        wrap: requested.wrap ?? settings.wrap,
+        wrap:
+          requested.wrap === 'off' ||
+          requested.wrap === 'column' ||
+          requested.wrap === 'auto'
+            ? requested.wrap
+            : settings.wrap,
+        // Falls back to what is already stored, not to the default: a call
+        // that only changes the wrap column must not reset the view mode.
+        defaultViewMode:
+          requested.defaultViewMode === undefined
+            ? settings.defaultViewMode
+            : requested.defaultViewMode === 'split'
+              ? 'split'
+              : 'unified',
         // Clamped here too, so the fixture cannot accept a value the real
         // backend would have refused.
         wrapLength: Math.min(

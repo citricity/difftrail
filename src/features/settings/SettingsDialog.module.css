@@ -108,6 +108,26 @@
   font-size: var(--code-font-size);
 }
 
+.select {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+/* Not in use under the current wrap mode. Still legible, because the value is
+   still stored and returns when fixed-column wrapping is chosen again. */
+.number:disabled {
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.select:focus-visible,
 .number:focus-visible {
   border-color: var(--accent);
   outline: none;

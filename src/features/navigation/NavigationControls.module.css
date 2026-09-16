@@ -46,6 +46,18 @@
   background: var(--accent-soft);
 }
 
+/* The selected half of a two-way toggle. Reads as pressed rather than as
+   hovered, which matters when the pointer is elsewhere. */
+.buttonActive {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.buttonActive:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .button:disabled {
   color: var(--text-faint);
 }

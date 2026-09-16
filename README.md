@@ -125,8 +125,8 @@ The geometry is read at runtime from the CSS custom properties in
 one-line change with no matching edit in TypeScript.
 
 By default lines do not wrap: long ones scroll horizontally while the
-line-number gutter stays pinned. Turning wrapping on in Settings wraps them
-at a fixed column instead — see below.
+line-number gutter stays pinned. Settings can wrap them at the edge of the
+window or at a fixed column instead — see below.
 
 ### Syntax colours
 
@@ -161,9 +161,17 @@ uncoloured rather than not at all.
 
 ### Wrapping
 
-Wrapping is off by default and switched on in Settings, where the column it
-wraps at is stored separately, so turning wrapping off and on again does not
-forget it.
+Wrapping is off by default. Settings offers two ways to turn it on:
+
+- **At window edge** (`auto`) wraps each line where it meets the edge of the
+  viewport — of one pane, in the split view — and rewraps as the window is
+  resized.
+- **At fixed column** (`column`) wraps at a chosen column whatever the window
+  size. The column is stored separately from the mode, so choosing another
+  mode and coming back does not forget it.
+
+Settings files from before `auto` existed stored `"wrap": true`; that still
+reads, as a fixed column.
 
 Diff Trail does the wrapping itself rather than handing it to CSS, and the
 reason is the scroll model. `white-space: pre-wrap` breaks at word boundaries
@@ -173,10 +181,49 @@ virtualiser exists to avoid. Wrapping at a fixed column keeps it arithmetic: a
 line is `ceil(length / column)` rows tall, and `lib/wrap.ts` splits its spans to
 match, preserving colour and change shading across the break.
 
+Auto wrapping is the same arithmetic with the column worked out rather than
+chosen. The code font is monospaced, so the column is the line's width, less
+the gutter and trailing padding, divided by one character's measured width
+(`autoWrapColumn` in `lib/rows.ts`), less one column of slack for wide glyphs.
+It never drops below 20; a narrower window scrolls rather than wrapping every
+line into fragments.
+
+Resizing therefore rebuilds the row model, which is the one expensive thing a
+drag can trigger, so it is kept in check twice over. The width that drives it
+is throttled to one update per 100 ms, with a trailing update so the size a
+drag ends on is always the one laid out (`lib/throttle.ts`); and the model is
+memoised on the whole-number column, so most of those updates change nothing.
+The viewport's own size is not throttled — the virtualiser needs it live, and
+it is cheap. When the column does change, the row at the top of the viewport
+is found in the new model and put back at the top before paint, so the text
+being read stays put while every wrapped line above it changes height.
 A continuation row carries no line number on either side. That is unambiguous
 on its own — every real diff line has at least one, an addition lacking only the
 old number and a deletion only the new — but it is quiet, so continuations also
 show a faint `↪` where the `+`/`-` marker would be.
+
+### Split view
+
+The toolbar toggles between one interleaved column and two panes, original on
+the left and working copy on the right. Settings holds the mode a window
+*opens* with; the toolbar changes the window you are in, and a preference
+arriving late never snatches back a choice already made.
+
+Each pane is the unified view in miniature — its own pinned gutter, the same
+wrapping, the same colours — and a row is as tall as its taller side, so the
+two keep a common baseline when one wraps and the other does not.
+
+Which deletion faces which addition is not something Git says; it only says
+what went and what came. `lib/pairing.ts` pairs them positionally within a
+changed block, first against first, with the remainder facing blanks — a blank
+being drawn as *absent* rather than empty, since an empty line is a real line
+with no text on it.
+
+The panes clip and translate rather than scroll. One scroller across two
+columns would walk you off the end of the left pane and into the right instead
+of holding both at the same column, so the horizontal offset is state, shared
+between the panes, driven by trackpad gestures, shift-wheel, and a scrollbar of
+the view's own.
 
 ### Expanding context
 
@@ -213,13 +260,35 @@ startup; that cap is also what bounds the size of the row model.
 ## Development
 
 ```bash
-pnpm check          # typecheck, lint, frontend tests, Rust tests
+pnpm check             # typecheck, lint, frontend tests, Rust tests
 pnpm typecheck
 pnpm lint
 pnpm test
 pnpm test:rust
+pnpm test:integration  # needs a browser; see below
 pnpm format
 ```
+
+### The integration suite
+
+`tests/integration/` builds the app, serves it, and drives a real browser
+against the built-in sample. It is not part of `pnpm check` because it needs a
+browser binary that a fresh clone does not have:
+
+```bash
+npx playwright install chromium
+pnpm test:integration
+```
+
+It exists because the unit tests run under jsdom, which has no layout engine —
+every element is zero by zero there, so a bug that makes the document zero
+pixels wide is invisible to it. One did exactly that: `useElementSize` measured
+nothing and reported zero forever, and two fallbacks hid it until the split view
+came to depend on the width alone. These assertions fail on that bug and pass
+without it, which was checked by putting it back.
+
+`DIFFTRAIL_CHROMIUM` overrides the browser path, for images that ship their own
+Chromium rather than Playwright's.
 
 ### The application icon
 

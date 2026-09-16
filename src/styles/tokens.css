@@ -27,6 +27,10 @@
   --placeholder-height: 44px;
   --file-gap: 14px;
   --gutter-width: 108px;
+  /* Clear space after the code on each line. Also read by auto wrapping,
+     which fits the code into what is left of the line after the gutter and
+     this. */
+  --content-padding: 16px;
   --toolbar-height: 40px;
 
   --radius: 4px;

@@ -9,7 +9,7 @@
 //! a preference is never worth an error screen in front of the diff.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Where wrapping is allowed to land, in characters.
@@ -23,21 +23,86 @@ const DEFAULT_WRAP_LENGTH: u32 = 120;
 
 const FILE_NAME: &str = "settings.json";
 
+/// How a file's diff is laid out.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ViewMode {
+    /// One column, deletions and additions interleaved.
+    #[default]
+    Unified,
+    /// Two panes, the original on the left and the working copy on the right.
+    Split,
+}
+
+/// Reads a view mode without letting an unrecognised one poison the file.
+///
+/// A plain derive would make `"viewMode": "sideBySide"` — a value from some
+/// future version, or a typo — fail the whole document, taking the wrap
+/// settings down with it. One unknown field is not worth forgetting everything
+/// else the user chose.
+fn lenient_view_mode<'de, D: Deserializer<'de>>(de: D) -> Result<ViewMode, D::Error> {
+    let raw = serde_json::Value::deserialize(de)?;
+    Ok(match raw.as_str() {
+        Some("split") => ViewMode::Split,
+        _ => ViewMode::default(),
+    })
+}
+
+/// Whether and where long lines wrap.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WrapMode {
+    /// Long lines scroll horizontally.
+    #[default]
+    Off,
+    /// Long lines wrap at `wrap_length`.
+    Column,
+    /// Long lines wrap at the edge of the viewport. The frontend works the
+    /// column out from the window width; nothing about it is stored.
+    Auto,
+}
+
+/// Reads a wrap mode, accepting the boolean earlier versions wrote.
+///
+/// `"wrap": true` meant a fixed column — there was no other kind — so it reads
+/// as `Column`, and a settings file from before `auto` existed keeps doing what
+/// it did. Anything unrecognised is `Off`, for the same reason as
+/// `lenient_view_mode`: one odd field must not discard the rest of the file.
+fn lenient_wrap_mode<'de, D: Deserializer<'de>>(de: D) -> Result<WrapMode, D::Error> {
+    let raw = serde_json::Value::deserialize(de)?;
+    Ok(match raw {
+        serde_json::Value::Bool(true) => WrapMode::Column,
+        serde_json::Value::String(value) => match value.as_str() {
+            "column" => WrapMode::Column,
+            "auto" => WrapMode::Auto,
+            _ => WrapMode::Off,
+        },
+        _ => WrapMode::Off,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    /// Whether long lines wrap rather than scrolling horizontally.
-    pub wrap: bool,
-    /// The column they wrap at. Kept independently of `wrap`, so turning
-    /// wrapping off and on again does not forget the chosen width.
+    /// Whether long lines wrap rather than scrolling horizontally, and where.
+    #[serde(default, deserialize_with = "lenient_wrap_mode")]
+    pub wrap: WrapMode,
+    /// The column `WrapMode::Column` wraps at. Kept independently of `wrap`, so
+    /// switching to another mode and back does not forget the chosen width.
     pub wrap_length: u32,
+    /// The layout a window opens with. The toolbar switches the view for the
+    /// session without disturbing this, so the two are deliberately distinct:
+    /// this is the starting point, not the current state.
+    #[serde(default, deserialize_with = "lenient_view_mode")]
+    pub default_view_mode: ViewMode,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            wrap: false,
+            wrap: WrapMode::Off,
             wrap_length: DEFAULT_WRAP_LENGTH,
+            default_view_mode: ViewMode::Unified,
         }
     }
 }
@@ -48,6 +113,7 @@ impl Settings {
         Self {
             wrap: self.wrap,
             wrap_length: self.wrap_length.clamp(MIN_WRAP_LENGTH, MAX_WRAP_LENGTH),
+            default_view_mode: self.default_view_mode,
         }
     }
 }
@@ -118,8 +184,81 @@ mod tests {
     #[test]
     fn wrapping_is_off_by_default_but_remembers_a_length() {
         let settings = Settings::default();
-        assert!(!settings.wrap);
+        assert_eq!(settings.wrap, WrapMode::Off);
         assert_eq!(settings.wrap_length, 120);
+        assert_eq!(settings.default_view_mode, ViewMode::Unified);
+    }
+
+    #[test]
+    fn the_view_mode_round_trips() {
+        let path = temp_dir("viewmode").join("settings.json");
+        let settings = Settings {
+            default_view_mode: ViewMode::Split,
+            ..Settings::default()
+        };
+
+        save_to(&path, settings).unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("\"split\""));
+        assert_eq!(load_from(&path), settings);
+    }
+
+    #[test]
+    fn an_unknown_view_mode_costs_only_itself() {
+        // The rest of the file has to survive it, or a value from a future
+        // version would silently reset everything the user chose.
+        let path = temp_dir("unknown-viewmode").join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{"wrap": true, "wrapLength": 90, "defaultViewMode": "sideBySide"}"#,
+        )
+        .unwrap();
+
+        let settings = load_from(&path);
+        assert_eq!(settings.wrap, WrapMode::Column);
+        assert_eq!(settings.wrap_length, 90);
+        assert_eq!(settings.default_view_mode, ViewMode::Unified);
+    }
+
+    #[test]
+    fn auto_wrapping_round_trips_as_a_string() {
+        let path = temp_dir("auto").join("settings.json");
+        let settings = Settings {
+            wrap: WrapMode::Auto,
+            ..Settings::default()
+        };
+
+        save_to(&path, settings).unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("\"auto\""));
+        assert_eq!(load_from(&path), settings);
+    }
+
+    #[test]
+    fn the_boolean_an_earlier_version_wrote_still_reads() {
+        // `true` was the only kind of wrapping there was: a fixed column.
+        let path = temp_dir("legacy-wrap").join("settings.json");
+
+        std::fs::write(&path, r#"{"wrap": true, "wrapLength": 90}"#).unwrap();
+        let settings = load_from(&path);
+        assert_eq!(settings.wrap, WrapMode::Column);
+        assert_eq!(settings.wrap_length, 90);
+
+        std::fs::write(&path, r#"{"wrap": false, "wrapLength": 90}"#).unwrap();
+        assert_eq!(load_from(&path).wrap, WrapMode::Off);
+    }
+
+    #[test]
+    fn an_unknown_wrap_mode_costs_only_itself() {
+        let path = temp_dir("unknown-wrap").join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{"wrap": "soft", "wrapLength": 90, "defaultViewMode": "split"}"#,
+        )
+        .unwrap();
+
+        let settings = load_from(&path);
+        assert_eq!(settings.wrap, WrapMode::Off);
+        assert_eq!(settings.wrap_length, 90);
+        assert_eq!(settings.default_view_mode, ViewMode::Split);
     }
 
     #[test]
@@ -141,7 +280,7 @@ mod tests {
         std::fs::write(&path, r#"{"wrap": true}"#).unwrap();
 
         let settings = load_from(&path);
-        assert!(settings.wrap);
+        assert_eq!(settings.wrap, WrapMode::Column);
         assert_eq!(settings.wrap_length, 120);
     }
 
@@ -155,8 +294,9 @@ mod tests {
         save_to(
             &path,
             Settings {
-                wrap: true,
+                wrap: WrapMode::Column,
                 wrap_length: 100_000,
+                ..Settings::default()
             },
         )
         .unwrap();
@@ -167,8 +307,9 @@ mod tests {
     fn saving_then_loading_round_trips() {
         let path = temp_dir("roundtrip").join("settings.json");
         let settings = Settings {
-            wrap: true,
+            wrap: WrapMode::Column,
             wrap_length: 100,
+            ..Settings::default()
         };
 
         save_to(&path, settings).unwrap();
