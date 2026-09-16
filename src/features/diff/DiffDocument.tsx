@@ -32,6 +32,8 @@ import {
 } from '../../lib/rows.ts';
 import type { RowMetrics, RowModel } from '../../lib/rows.ts';
 import { runsForContextLine, runsForLine } from '../../lib/rowRuns.ts';
+import { buildNavigationIndex, sameLocation } from '../../lib/navigation.ts';
+import { buildScrollStops, changeInView } from '../../lib/scrollFollow.ts';
 import type {
   ChangeLocation,
   DiffHunk,
@@ -71,6 +73,12 @@ interface Props {
    */
   revealRequest: number;
   onSelect: (location: ChangeLocation) => void;
+  /**
+   * Told when the reader scrolls onto a different change, so the position
+   * readout and Previous/Next carry on from what is in view. The document does
+   * not reveal it — the reader is already looking at it.
+   */
+  onScrollToChange?: (location: ChangeLocation) => void;
   /** Go to a file chosen from the file list. */
   onSelectFile: (fileId: string) => void;
   onVisibleFileChange: (fileId: string) => void;
@@ -96,6 +104,7 @@ export function DiffDocument({
   current,
   revealRequest,
   onSelect,
+  onScrollToChange,
   onSelectFile,
   onVisibleFileChange,
   onToggleCollapse,
@@ -174,18 +183,86 @@ export function DiffDocument({
     return map;
   }, [files]);
 
+  /**
+   * Where the document last put `scrollTop` itself, until the scroll event that
+   * causes arrives. Only the reader's own scrolling should move the current
+   * change: a reveal already chose it, and one clamped at the end of the
+   * document must not be second-guessed into the hunk above.
+   */
+  const assignedScrollTop = useRef<number | null>(null);
+  /** Set by a scroll the reader made, cleared once the frame has followed it. */
+  const readerScrolled = useRef(false);
+
+  const assignScrollTop = useCallback((element: HTMLDivElement, value: number) => {
+    element.scrollTop = value;
+    assignedScrollTop.current = element.scrollTop;
+    liveScrollTop.current = element.scrollTop;
+    setScrollTop(element.scrollTop);
+  }, []);
+
+  const lastRevealed = useRef<string | null>(null);
+
+  const stops = useMemo(
+    () => buildScrollStops(model, buildNavigationIndex(files)),
+    [model, files],
+  );
+
+  /**
+   * What following the scroll needs, as of the latest render. Read from the
+   * animation frame, which would otherwise see the values of whichever render
+   * created the scroll handler.
+   */
+  const follow = useRef({
+    stops,
+    current,
+    revealRequest,
+    viewportHeight: 0,
+    fileHeaderHeight: metrics.fileHeaderHeight,
+    onScrollToChange,
+  });
+
+  const followScroll = useCallback((top: number) => {
+    const latest = follow.current;
+    if (latest.onScrollToChange === undefined) return;
+
+    const location = changeInView(
+      latest.stops,
+      top + latest.fileHeaderHeight + SCROLL_MARGIN,
+      top + latest.viewportHeight,
+    );
+    if (location === null || sameLocation(location, latest.current)) return;
+
+    // Mark it revealed, or the reveal effect would scroll it to the reading
+    // line — pulling the view out from under the reader.
+    lastRevealed.current = `${location.fileId}|${location.hunkId ?? ''}|${latest.revealRequest}`;
+    latest.onScrollToChange(location);
+  }, []);
+
   // Scroll events fire faster than frames; collapsing them to one state update
   // per frame keeps a fast flick from queueing dozens of renders.
   const frame = useRef<number | null>(null);
   const handleScroll = useCallback(() => {
-    liveScrollTop.current = viewportRef.current?.scrollTop ?? 0;
+    const top = viewportRef.current?.scrollTop ?? 0;
+    liveScrollTop.current = top;
+
+    const assigned = assignedScrollTop.current;
+    assignedScrollTop.current = null;
+    if (assigned === null || Math.abs(top - assigned) >= 1)
+      readerScrolled.current = true;
+
     if (frame.current !== null) return;
 
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
-      setScrollTop(viewportRef.current?.scrollTop ?? 0);
+      const latest = viewportRef.current?.scrollTop ?? 0;
+      setScrollTop(latest);
+
+      if (readerScrolled.current) {
+        readerScrolled.current = false;
+        followScroll(latest);
+      }
     });
-  }, []);
+  }, [followScroll]);
 
   useEffect(
     () => () => {
@@ -205,8 +282,6 @@ export function DiffDocument({
    * The key guard stops an unrelated model rebuild (another file finishing in
    * the background) from yanking the view back to where it already is.
    */
-  const lastRevealed = useRef<string | null>(null);
-
   useEffect(() => {
     const element = viewportRef.current;
     if (element === null || current === null) return;
@@ -218,11 +293,22 @@ export function DiffDocument({
     if (offset === null) return;
 
     lastRevealed.current = key;
+    // A frame still waiting to follow a scroll made before this reveal would
+    // otherwise follow the reveal instead.
+    readerScrolled.current = false;
     // Clear the sticky file header as well, or the change lands underneath it.
-    element.scrollTop = Math.max(0, offset - metrics.fileHeaderHeight - SCROLL_MARGIN);
-    liveScrollTop.current = element.scrollTop;
-    setScrollTop(element.scrollTop);
-  }, [current, model, metrics.fileHeaderHeight, revealRequest, viewport]);
+    assignScrollTop(
+      element,
+      Math.max(0, offset - metrics.fileHeaderHeight - SCROLL_MARGIN),
+    );
+  }, [
+    current,
+    model,
+    metrics.fileHeaderHeight,
+    revealRequest,
+    viewport,
+    assignScrollTop,
+  ]);
 
   /**
    * Keeps the reader's place whenever the model is rebuilt.
@@ -258,10 +344,8 @@ export function DiffDocument({
     const restored = offsetOfAnchor(model, anchor);
     if (restored === null || Math.abs(restored - liveScrollTop.current) < 0.5) return;
 
-    element.scrollTop = restored;
-    liveScrollTop.current = element.scrollTop;
-    setScrollTop(element.scrollTop);
-  }, [model]);
+    assignScrollTop(element, restored);
+  }, [model, assignScrollTop]);
 
   // Let the loader know which part of the document is being read, so it can
   // fetch the neighbouring diffs before they are scrolled into view.
@@ -284,6 +368,17 @@ export function DiffDocument({
   useEffect(() => {
     if (visibleFile !== null) onVisibleFileChange(visibleFile);
   }, [visibleFile, onVisibleFileChange]);
+
+  useLayoutEffect(() => {
+    follow.current = {
+      stops,
+      current,
+      revealRequest,
+      viewportHeight,
+      fileHeaderHeight: metrics.fileHeaderHeight,
+      onScrollToChange,
+    };
+  });
 
   const range = visibleRange(model, scrollTop, viewportHeight, OVERSCAN);
   const endHeight = endOfDocumentHeight(viewportHeight, metrics);
