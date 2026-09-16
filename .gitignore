@@ -12,3 +12,4 @@ src-tauri/gen/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+Claude outputs/
