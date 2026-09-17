@@ -58,10 +58,12 @@ pub struct AliasStatus {
 /// `!f() { ...; }; f` is Git's idiom for an alias that needs a real shell. The
 /// root is passed explicitly because a macOS `.app` is not started with the
 /// shell's working directory. `git rev-parse` fails outside a repository, which
-/// is the error the user should see rather than an empty window.
+/// is the error the user should see rather than an empty window. Git hands the
+/// alias's own arguments to `f`, and `"$@"` passes them on after the root, so
+/// `git dt main...HEAD` opens that range.
 pub fn alias_value(binary: &str) -> String {
     format!(
-        "!f() {{ root=$(git rev-parse --show-toplevel) || exit 1; \"{}\" \"$root\" >/dev/null 2>&1 & }}; f",
+        "!f() {{ root=$(git rev-parse --show-toplevel) || exit 1; \"{}\" \"$root\" \"$@\" >/dev/null 2>&1 & }}; f",
         escape_double_quoted(binary)
     )
 }
@@ -221,7 +223,7 @@ mod tests {
         assert_eq!(
             alias_value("/Applications/Diff Trail.app/Contents/MacOS/diff-trail"),
             "!f() { root=$(git rev-parse --show-toplevel) || exit 1; \
-             \"/Applications/Diff Trail.app/Contents/MacOS/diff-trail\" \"$root\" \
+             \"/Applications/Diff Trail.app/Contents/MacOS/diff-trail\" \"$root\" \"$@\" \
              >/dev/null 2>&1 & }; f"
         );
     }

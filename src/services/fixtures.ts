@@ -293,6 +293,7 @@ const REPOSITORY: RepositoryInfo = {
   branch: 'main',
   head: 'a1b2c3d',
   detached: false,
+  comparison: null,
 };
 
 /**

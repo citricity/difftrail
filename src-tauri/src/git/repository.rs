@@ -6,10 +6,15 @@
 //! therefore excluded, and untracked files never appear (v2 feature).
 //! This matches `git difftool --dir-diff --no-symlinks`, which is where the
 //! design started, without needing its temporary directories.
+//!
+//! Given a commit or range on the command line (see [`super::revision`]), every
+//! function here reads between those two commits instead, and never touches
+//! the index or the working tree.
 
 use super::command::{literal_pathspec, run};
-use super::model::{ChangedFile, FileDiff, RepositoryInfo};
+use super::model::{ChangedFile, ComparisonInfo, FileDiff, RepositoryInfo};
 use super::parse::{merge_changed_files, parse_file_diff, parse_name_status, parse_numstat};
+use super::revision::Comparison;
 use crate::error::{AppError, AppResult, ErrorKind};
 use std::path::{Path, PathBuf};
 
@@ -41,7 +46,7 @@ pub fn discover(start: &Path) -> AppResult<PathBuf> {
 ///
 /// A repository with no commits is not an error here: the header still renders,
 /// and the (empty) changed-file list follows.
-pub fn info(root: &Path) -> AppResult<RepositoryInfo> {
+pub fn info(root: &Path, comparison: Option<ComparisonInfo>) -> AppResult<RepositoryInfo> {
     let branch = run(root, &["rev-parse", "--abbrev-ref", "HEAD"])
         .ok()
         .map(|output| output.text().trim().to_string())
@@ -65,16 +70,26 @@ pub fn info(root: &Path) -> AppResult<RepositoryInfo> {
         branch: if detached { None } else { branch },
         head,
         detached,
+        comparison,
     })
 }
 
-/// Lists every tracked file with unstaged modifications.
+/// Lists every tracked file with unstaged modifications, or every file that
+/// differs between the two commits of a comparison.
 ///
 /// Two cheap Git calls, no diff bodies — this is what lets the document
 /// skeleton render before any content has been read.
-pub fn changed_files(root: &Path) -> AppResult<Vec<ChangedFile>> {
-    let name_status = run(root, &["diff", "--name-status", "-z", "--find-renames"])?;
-    let numstat = run(root, &["diff", "--numstat", "-z", "--find-renames"])?;
+pub fn changed_files(root: &Path, comparison: &Comparison) -> AppResult<Vec<ChangedFile>> {
+    let revisions = comparison.diff_args();
+    let listing = |format: &'static str| {
+        let mut args = vec!["diff", "--no-ext-diff", format, "-z", "--find-renames"];
+        args.extend(revisions.iter().copied());
+        args.push("--");
+        run(root, &args)
+    };
+
+    let name_status = listing("--name-status")?;
+    let numstat = listing("--numstat")?;
 
     Ok(merge_changed_files(
         parse_name_status(&name_status.text()),
@@ -86,7 +101,12 @@ pub fn changed_files(root: &Path) -> AppResult<Vec<ChangedFile>> {
 ///
 /// `meta` must come from [`changed_files`]; it carries the status and rename
 /// information that the diff body alone does not reliably provide.
-pub fn file_diff(root: &Path, meta: &ChangedFile, max_bytes: usize) -> AppResult<FileDiff> {
+pub fn file_diff(
+    root: &Path,
+    comparison: &Comparison,
+    meta: &ChangedFile,
+    max_bytes: usize,
+) -> AppResult<FileDiff> {
     if meta.binary {
         return Ok(FileDiff {
             id: meta.id.clone(),
@@ -112,9 +132,10 @@ pub fn file_diff(root: &Path, meta: &ChangedFile, max_bytes: usize) -> AppResult
         "--no-textconv",
         "--find-renames",
         &context,
-        "--",
-        &pathspec,
     ];
+    args.extend(comparison.diff_args());
+    args.push("--");
+    args.push(&pathspec);
 
     // For a rename, Git needs both sides named or it reports nothing.
     let old_pathspec;
@@ -146,9 +167,9 @@ pub fn file_diff(root: &Path, meta: &ChangedFile, max_bytes: usize) -> AppResult
 /// Which side of the comparison to read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
-    /// The staged/committed version — the left-hand side of the diff.
+    /// The left-hand side: the index, or a comparison's base commit.
     Original,
-    /// The file as it exists on disk right now.
+    /// The right-hand side: the file on disk, or a comparison's target commit.
     Working,
 }
 
@@ -167,8 +188,13 @@ impl Side {
 }
 
 /// Reads one whole side of a file, for expanding context beyond the hunks.
-pub fn file_contents(root: &Path, path: &str, side: Side) -> AppResult<String> {
-    file_bytes(root, path, side).map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+pub fn file_contents(
+    root: &Path,
+    comparison: &Comparison,
+    path: &str,
+    side: Side,
+) -> AppResult<String> {
+    file_bytes(root, comparison, path, side).map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// Largest image either side may be, in bytes. It crosses the IPC boundary
@@ -196,7 +222,12 @@ pub fn is_image_path(path: &str) -> bool {
 /// Refuses anything that is not an image by extension, so this cannot become
 /// a general way to pull arbitrary bytes into the webview, and anything over
 /// `MAX_IMAGE_BYTES`.
-pub fn image_bytes(root: &Path, path: &str, side: Side) -> AppResult<Vec<u8>> {
+pub fn image_bytes(
+    root: &Path,
+    comparison: &Comparison,
+    path: &str,
+    side: Side,
+) -> AppResult<Vec<u8>> {
     if !is_image_path(path) {
         return Err(AppError::new(
             ErrorKind::BinaryFile,
@@ -204,7 +235,7 @@ pub fn image_bytes(root: &Path, path: &str, side: Side) -> AppResult<Vec<u8>> {
         ));
     }
 
-    let bytes = file_bytes(root, path, side)?;
+    let bytes = file_bytes(root, comparison, path, side)?;
     if bytes.len() > MAX_IMAGE_BYTES {
         return Err(AppError::new(
             ErrorKind::BinaryFile,
@@ -219,7 +250,16 @@ pub fn image_bytes(root: &Path, path: &str, side: Side) -> AppResult<Vec<u8>> {
 }
 
 /// Reads one whole side of a file as bytes, exactly as stored.
-fn file_bytes(root: &Path, path: &str, side: Side) -> AppResult<Vec<u8>> {
+fn file_bytes(root: &Path, comparison: &Comparison, path: &str, side: Side) -> AppResult<Vec<u8>> {
+    if let Comparison::Commits { base, target } = comparison {
+        let commit = match side {
+            Side::Original => base,
+            Side::Working => target,
+        };
+        let spec = format!("{commit}:{path}");
+        return Ok(run(root, &["show", &spec])?.stdout);
+    }
+
     match side {
         Side::Original => {
             // `:path` is the index version, which is the left side of `git diff`.
@@ -262,7 +302,7 @@ mod tests {
 
     #[test]
     fn image_bytes_refuses_a_file_that_is_not_an_image() {
-        let error = image_bytes(Path::new("."), "src/main.rs", Side::Working).unwrap_err();
+        let error = image_bytes(Path::new("."), &Comparison::WorkingTree, "src/main.rs", Side::Working).unwrap_err();
         assert_eq!(error.kind, ErrorKind::BinaryFile);
     }
 
