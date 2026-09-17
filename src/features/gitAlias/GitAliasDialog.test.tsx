@@ -102,6 +102,57 @@ describe('GitAliasDialog', () => {
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
   });
 
+  it('stays closed when a read it was waiting for arrives after Escape', async () => {
+    let answer: (status: GitAliasStatus) => void = () => undefined;
+    getGitAliasStatus.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const { container } = render(<GitAliasDialog />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => requested());
+
+    const dialog = container.querySelector('dialog');
+    if (dialog === null) throw new Error('no dialog');
+    // Escape on a modal dialog fires `close`.
+    fireEvent(dialog, new Event('close'));
+
+    await act(async () => {
+      answer(STATUS);
+      await Promise.resolve();
+    });
+
+    expect(dialog.hasAttribute('open')).toBe(false);
+    expect(screen.queryByText(STATUS.command)).toBeNull();
+  });
+
+  it('ignores an earlier read that answers after a later one', async () => {
+    let answerFirst: (status: GitAliasStatus) => void = () => undefined;
+    getGitAliasStatus
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          answerFirst = resolve;
+        }),
+      )
+      .mockResolvedValue({ ...STATUS, installed: true });
+    await openFromMenu();
+
+    // Chosen again before the first read answers.
+    act(() => requested());
+    expect(await screen.findByText(/already set up/)).toBeTruthy();
+
+    await act(async () => {
+      answerFirst(STATUS);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText(/already set up/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
+  });
+
   it('reports a failure with the backend message and can try again', async () => {
     installGitAlias.mockRejectedValue(
       new AppError({

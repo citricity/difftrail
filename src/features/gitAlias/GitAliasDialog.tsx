@@ -53,10 +53,23 @@ export function GitAliasDialog({ ref, onStatusChange }: Props) {
     statusListener.current = onStatusChange;
   }, [onStatusChange]);
 
+  /**
+   * The request whose answer the dialog is waiting for.
+   *
+   * Every read, install and close takes a new number, and an answer is only
+   * applied if nothing has happened since it was asked for. Otherwise a slow
+   * read could reopen a dialog the user has already dismissed with Escape, or
+   * overwrite a newer answer — an earlier "not installed" landing after the
+   * install that followed it.
+   */
+  const request = useRef(0);
+
   const start = useCallback(() => {
+    const ticket = ++request.current;
     setStage({ name: 'loading' });
     getGitAliasStatus().then(
       (status) => {
+        if (ticket !== request.current) return;
         statusListener.current?.(status);
         setStage(
           status.installed
@@ -64,8 +77,10 @@ export function GitAliasDialog({ ref, onStatusChange }: Props) {
             : { name: 'confirm', status, installing: false },
         );
       },
-      (thrown: unknown) =>
-        setStage({ name: 'failed', message: AppError.from(thrown).message }),
+      (thrown: unknown) => {
+        if (ticket !== request.current) return;
+        setStage({ name: 'failed', message: AppError.from(thrown).message });
+      },
     );
   }, []);
 
@@ -106,19 +121,28 @@ export function GitAliasDialog({ ref, onStatusChange }: Props) {
     }
   }, [open]);
 
-  const close = useCallback(() => setStage({ name: 'closed' }), []);
+  const close = useCallback(() => {
+    request.current++;
+    setStage({ name: 'closed' });
+  }, []);
 
   const install = useCallback(() => {
     setStage((previous) =>
       previous.name === 'confirm' ? { ...previous, installing: true } : previous,
     );
+    const ticket = ++request.current;
     installGitAlias().then(
       (status) => {
+        // The alias was written whether or not anyone is still watching, so
+        // the listener hears about it even if the dialog has been dismissed.
         statusListener.current?.(status);
-        setStage({ name: 'done', status, already: false });
+        if (ticket === request.current)
+          setStage({ name: 'done', status, already: false });
       },
-      (thrown: unknown) =>
-        setStage({ name: 'failed', message: AppError.from(thrown).message }),
+      (thrown: unknown) => {
+        if (ticket !== request.current) return;
+        setStage({ name: 'failed', message: AppError.from(thrown).message });
+      },
     );
   }, []);
 

@@ -32,18 +32,25 @@ function aliasFrom(status: GitAliasStatus): Alias {
 export function NotARepository() {
   const [alias, setAlias] = useState<Alias>('checking');
   const dialog = useRef<GitAliasDialogHandle>(null);
+  /**
+   * Set once the dialog has reported a status. Anything it reports is newer
+   * than the read this screen started on mount, so that read, if it is still
+   * outstanding, must not overwrite it.
+   */
+  const heardFromDialog = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    const stale = () => cancelled || heardFromDialog.current;
 
     getGitAliasStatus().then(
       (status) => {
-        if (!cancelled) setAlias(aliasFrom(status));
+        if (!stale()) setAlias(aliasFrom(status));
       },
       (thrown: unknown) => {
         console.error('[difftrek] could not read the git dt alias', thrown);
         // Offer the install: if Git itself is the problem, the dialog says so.
-        if (!cancelled) setAlias('missing');
+        if (!stale()) setAlias('missing');
       },
     );
 
@@ -54,13 +61,20 @@ export function NotARepository() {
 
   // Installing from the dialog, or from the menu, changes what this screen says.
   const handleStatusChange = useCallback((status: GitAliasStatus) => {
+    heardFromDialog.current = true;
     setAlias(aliasFrom(status));
   }, []);
 
   const openDialog = useCallback(() => dialog.current?.open(), []);
 
   return (
-    <div className={styles.screen} aria-busy={alias === 'checking'}>
+    <div className={styles.screen}>
+      {alias === 'checking' && (
+        <p className={styles.message} role="status">
+          Checking for the <code>git dt</code> command…
+        </p>
+      )}
+
       {alias === 'installed' && (
         <>
           <GitCompare className={styles.icon} size={22} aria-hidden="true" />

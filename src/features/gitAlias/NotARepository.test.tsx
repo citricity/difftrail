@@ -3,17 +3,22 @@
  * to install git dt when that is missing, and explains how to use it when not.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GitAliasStatus } from '../../types/index.ts';
 
 const getGitAliasStatus = vi.fn<() => Promise<GitAliasStatus>>();
 const installGitAlias = vi.fn<() => Promise<GitAliasStatus>>();
 
+let requested: () => void = () => undefined;
+
 vi.mock('../../services/backend.ts', () => ({
   getGitAliasStatus,
   installGitAlias,
-  onGitAliasRequested: () => Promise.resolve(() => undefined),
+  onGitAliasRequested: (handler: () => void) => {
+    requested = handler;
+    return Promise.resolve(() => undefined);
+  },
 }));
 
 const { NotARepository } = await import('./NotARepository.tsx');
@@ -83,6 +88,43 @@ describe('NotARepository', () => {
 
     expect(await screen.findByText(/only supports diffs from within Git/)).toBeTruthy();
     expect(installGitAlias).toHaveBeenCalledTimes(1);
+  });
+
+  it('says it is checking while the alias is read', () => {
+    getGitAliasStatus.mockReturnValue(new Promise(() => undefined));
+    render(<NotARepository />);
+
+    expect(screen.getByRole('status').textContent).toMatch(
+      /Checking for the git dt command/,
+    );
+  });
+
+  it('keeps a newer answer from the dialog over a slow first read', async () => {
+    let answerFirstRead: (status: GitAliasStatus) => void = () => undefined;
+    getGitAliasStatus
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          answerFirstRead = resolve;
+        }),
+      )
+      .mockResolvedValue(STATUS);
+
+    const { container } = render(<NotARepository />);
+    // Installed from the menu while the screen's own read is still out.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => requested());
+    fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
+    expect(await screen.findByText(/only supports diffs from within Git/)).toBeTruthy();
+
+    await act(async () => {
+      answerFirstRead(STATUS);
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toMatch(/only supports diffs from within Git/);
+    expect(screen.queryByRole('button', { name: /Install git dt Command/ })).toBeNull();
   });
 
   it('still offers the install when the alias cannot be read', async () => {
