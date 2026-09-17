@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { matchesDiff, splitLines } from './fileText.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { getFileContents } from './backend.ts';
+import { loadFileText, matchesDiff, splitLines } from './fileText.ts';
 import { makeDiff, makeHunk, makeLine } from '../test/factories.ts';
 import type { FileDiff, FileText } from '../types/index.ts';
+
+vi.mock('./backend.ts', () => ({
+  getFileContents: vi.fn(() => Promise.resolve('one\n')),
+}));
 
 function diffOf(lines: Parameters<typeof makeHunk>[2]): FileDiff {
   return { ...makeDiff('a.ts', 0), hunks: [makeHunk('a.ts', 0, lines)] };
@@ -72,5 +77,24 @@ describe('matchesDiff', () => {
 
     expect(matchesDiff(deletion, text)).toBe(false);
     expect(matchesDiff(addition, text)).toBe(false);
+  });
+});
+
+describe('loadFileText', () => {
+  it('asks for a rename by its current path on both sides', async () => {
+    // The backend only knows a file by its current path, and reads the
+    // original side of a rename from the path it had before.
+    const diff: FileDiff = {
+      ...makeDiff('new.ts', 0, { oldPath: 'old.ts', status: 'renamed' }),
+      hunks: [makeHunk('new.ts', 0, [makeLine('context', 'one', { old: 1, new: 1 })])],
+    };
+
+    const text = await loadFileText(diff);
+
+    expect(vi.mocked(getFileContents).mock.calls).toEqual([
+      ['new.ts', 'original'],
+      ['new.ts', 'working'],
+    ]);
+    expect(text).toEqual({ original: ['one'], working: ['one'] });
   });
 });

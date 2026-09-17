@@ -82,7 +82,16 @@ pub fn info(root: &Path, comparison: Option<ComparisonInfo>) -> AppResult<Reposi
 pub fn changed_files(root: &Path, comparison: &Comparison) -> AppResult<Vec<ChangedFile>> {
     let revisions = comparison.diff_args();
     let listing = |format: &'static str| {
-        let mut args = vec!["diff", "--no-ext-diff", format, "-z", "--find-renames"];
+        // Same textconv setting as `file_diff`, so counts, binary flags and
+        // renames describe the raw content the bodies show.
+        let mut args = vec![
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            format,
+            "-z",
+            "--find-renames",
+        ];
         args.extend(revisions.iter().copied());
         args.push("--");
         run(root, &args)
