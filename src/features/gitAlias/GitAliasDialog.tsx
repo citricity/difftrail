@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import { X } from 'lucide-react';
 import {
   getGitAliasStatus,
@@ -17,6 +18,17 @@ type Stage =
   | { name: 'done'; status: GitAliasStatus; already: boolean }
   | { name: 'failed'; message: string };
 
+/** For a screen that offers installing as a button, not only from the menu. */
+export interface GitAliasDialogHandle {
+  open: () => void;
+}
+
+interface Props {
+  ref?: Ref<GitAliasDialogHandle>;
+  /** Told of every status the dialog reads or installs. */
+  onStatusChange?: (status: GitAliasStatus) => void;
+}
+
 /**
  * Installs the `git dt` alias, after asking.
  *
@@ -29,20 +41,29 @@ type Stage =
  * The status is read afresh on every opening, since the configuration can
  * change between them. A native `<dialog>`, like Settings.
  */
-export function GitAliasDialog() {
+export function GitAliasDialog({ ref, onStatusChange }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [stage, setStage] = useState<Stage>({ name: 'closed' });
   const open = stage.name !== 'closed';
 
+  // Held in a ref so a parent passing a fresh callback each render does not
+  // resubscribe to the menu or reopen the dialog.
+  const statusListener = useRef(onStatusChange);
+  useEffect(() => {
+    statusListener.current = onStatusChange;
+  }, [onStatusChange]);
+
   const start = useCallback(() => {
     setStage({ name: 'loading' });
     getGitAliasStatus().then(
-      (status) =>
+      (status) => {
+        statusListener.current?.(status);
         setStage(
           status.installed
             ? { name: 'done', status, already: true }
             : { name: 'confirm', status, installing: false },
-        ),
+        );
+      },
       (thrown: unknown) =>
         setStage({ name: 'failed', message: AppError.from(thrown).message }),
     );
@@ -68,6 +89,8 @@ export function GitAliasDialog() {
     };
   }, [start]);
 
+  useImperativeHandle(ref, () => ({ open: start }), [start]);
+
   useEffect(() => {
     const element = dialog.current;
     if (element === null) return;
@@ -90,7 +113,10 @@ export function GitAliasDialog() {
       previous.name === 'confirm' ? { ...previous, installing: true } : previous,
     );
     installGitAlias().then(
-      (status) => setStage({ name: 'done', status, already: false }),
+      (status) => {
+        statusListener.current?.(status);
+        setStage({ name: 'done', status, already: false });
+      },
       (thrown: unknown) =>
         setStage({ name: 'failed', message: AppError.from(thrown).message }),
     );
