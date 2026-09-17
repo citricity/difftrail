@@ -148,6 +148,7 @@ export function App() {
         current={navigation.current}
         revealRequest={navigation.revealRequest}
         onSelect={navigation.goTo}
+        onScrollToChange={navigation.goTo}
         onSelectFile={navigation.goToFile}
         onVisibleFileChange={prefetchAround}
         onToggleCollapse={toggleCollapse}
