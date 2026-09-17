@@ -790,10 +790,13 @@
               <code>dt</code> alias it would replace, before it runs anything.
             </p>
             <p>Or set it yourself from a terminal:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "/Applications/Diff Trek.app/Contents/MacOS/diff-trek" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; open -n "/Applications/Diff Trek.app" --args "$root" "$@"; }; f'</code></pre>
             <p class="muted">
               Install Diff Trek into Applications first. An alias pointing at the copy
               inside the disk image stops working as soon as the image is ejected.
+              The alias launches it with <code>open</code> so that its window comes to
+              the front — set up with an earlier version, it opened behind the
+              terminal; install it again to fix that.
             </p>
           </div>
 

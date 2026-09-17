@@ -60,8 +60,19 @@ fi
 # `git rev-parse --show-toplevel` fails outside a repository, which is the
 # error the user should see rather than an empty window. "$@" forwards the
 # alias's own arguments, so `git dt main...HEAD` opens that range.
+#
+# Inside a .app bundle, launch through `open -n`: macOS refuses focus to an app
+# whose executable the terminal ran directly, so its window would open behind
+# the terminal. Keep in step with `alias_value` in src-tauri/src/git_alias.rs.
+if [[ "$BINARY" =~ ^(.+\.app)/Contents/MacOS/[^/]+$ ]]; then
+  BUNDLE="${BASH_REMATCH[1]}"
+  LAUNCH="open -n \"$BUNDLE\" --args \"\$root\" \"\$@\";"
+else
+  LAUNCH="\"$BINARY\" \"\$root\" \"\$@\" >/dev/null 2>&1 &"
+fi
+
 git config "$SCOPE" alias.dt \
-  "!f() { root=\$(git rev-parse --show-toplevel) || exit 1; \"$BINARY\" \"\$root\" \"\$@\" >/dev/null 2>&1 & }; f"
+  "!f() { root=\$(git rev-parse --show-toplevel) || exit 1; $LAUNCH }; f"
 
 echo "Installed: git dt"
 echo "  binary: $BINARY"

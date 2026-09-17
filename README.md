@@ -54,7 +54,10 @@ pnpm tauri build
 
 `git dt` then opens Diff Trek on whichever repository you are standing in. The
 alias resolves the repository root itself and passes it as an argument, because
-a macOS `.app` bundle does not inherit the shell's working directory. Anything
+a macOS `.app` bundle does not inherit the shell's working directory. On macOS
+it launches the bundle with `open -n` rather than running its executable, because
+macOS will not give focus to an app the terminal started directly — its window
+would open behind the terminal. Anything
 after `git dt` is passed on too, so it can open a commit or a range instead:
 
 ```bash
@@ -70,8 +73,8 @@ compared with its first parent, like `git show`; a root commit with nothing.
 Without the alias the revision goes after the repository path:
 `diff-trek /path/to/repo main...HEAD`.
 
-An alias installed by an earlier version does not pass arguments on; install it
-again to pick this up.
+An alias installed by an earlier version may not pass arguments on, or may open
+the window behind the terminal; install it again to pick up both.
 
 ## What it shows
 

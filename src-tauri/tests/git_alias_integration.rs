@@ -78,6 +78,50 @@ fn installs_an_alias_that_launches_the_binary_on_the_repository_root() {
 }
 
 #[test]
+fn launches_an_app_bundle_through_open() {
+    let base = scratch("bundle");
+
+    // A stand-in for macOS's `open`, first on PATH, recording its arguments.
+    // The bundle itself is never touched, so it need not exist.
+    let stubs = base.join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let record = base.join("open-with.txt");
+    let open = stubs.join("open");
+    fs::write(&open, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n", record.display()))
+        .unwrap();
+    fs::set_permissions(&open, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let bundle = base.join(r#"Apps/Diff "Trek" $HOME.app"#);
+    let binary = bundle.join("Contents/MacOS/diff-trek");
+
+    let repo = base.join("repo");
+    fs::create_dir_all(repo.join("nested")).unwrap();
+    git(&repo, &["init", "--quiet"]);
+    let target = ConfigTarget::File(repo.join(".git/config"));
+    assert!(install(binary.to_str().unwrap(), &target).unwrap().installed);
+
+    let path = format!("{}:{}", stubs.display(), std::env::var("PATH").unwrap());
+    let output = Command::new("git")
+        .args(["dt", "main...HEAD", "two words"])
+        .current_dir(repo.join("nested"))
+        .env("PATH", path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "git dt: {}", String::from_utf8_lossy(&output.stderr));
+
+    // `open` is run in the foreground, so it has finished by now.
+    assert_eq!(
+        fs::read_to_string(&record).unwrap(),
+        format!(
+            "-n\n{}\n--args\n{}\nmain...HEAD\ntwo words\n",
+            bundle.to_str().unwrap(),
+            repo.to_str().unwrap()
+        )
+    );
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[test]
 fn replaces_an_existing_dt_alias_and_reports_it_first() {
     let base = scratch("replace");
     let config = base.join("config");
