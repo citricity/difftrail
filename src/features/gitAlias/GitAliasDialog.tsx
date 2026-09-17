@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import { X } from 'lucide-react';
 import {
   getGitAliasStatus,
@@ -17,6 +18,17 @@ type Stage =
   | { name: 'done'; status: GitAliasStatus; already: boolean }
   | { name: 'failed'; message: string };
 
+/** For a screen that offers installing as a button, not only from the menu. */
+export interface GitAliasDialogHandle {
+  open: () => void;
+}
+
+interface Props {
+  ref?: Ref<GitAliasDialogHandle>;
+  /** Told of every status the dialog reads or installs. */
+  onStatusChange?: (status: GitAliasStatus) => void;
+}
+
 /**
  * Installs the `git dt` alias, after asking.
  *
@@ -29,22 +41,46 @@ type Stage =
  * The status is read afresh on every opening, since the configuration can
  * change between them. A native `<dialog>`, like Settings.
  */
-export function GitAliasDialog() {
+export function GitAliasDialog({ ref, onStatusChange }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [stage, setStage] = useState<Stage>({ name: 'closed' });
   const open = stage.name !== 'closed';
 
+  // Held in a ref so a parent passing a fresh callback each render does not
+  // resubscribe to the menu or reopen the dialog.
+  const statusListener = useRef(onStatusChange);
+  useEffect(() => {
+    statusListener.current = onStatusChange;
+  }, [onStatusChange]);
+
+  /**
+   * The request whose answer the dialog is waiting for.
+   *
+   * Every read, install and close takes a new number, and an answer is only
+   * applied if nothing has happened since it was asked for. Otherwise a slow
+   * read could reopen a dialog the user has already dismissed with Escape, or
+   * overwrite a newer answer — an earlier "not installed" landing after the
+   * install that followed it.
+   */
+  const request = useRef(0);
+
   const start = useCallback(() => {
+    const ticket = ++request.current;
     setStage({ name: 'loading' });
     getGitAliasStatus().then(
-      (status) =>
+      (status) => {
+        if (ticket !== request.current) return;
+        statusListener.current?.(status);
         setStage(
           status.installed
             ? { name: 'done', status, already: true }
             : { name: 'confirm', status, installing: false },
-        ),
-      (thrown: unknown) =>
-        setStage({ name: 'failed', message: AppError.from(thrown).message }),
+        );
+      },
+      (thrown: unknown) => {
+        if (ticket !== request.current) return;
+        setStage({ name: 'failed', message: AppError.from(thrown).message });
+      },
     );
   }, []);
 
@@ -68,6 +104,8 @@ export function GitAliasDialog() {
     };
   }, [start]);
 
+  useImperativeHandle(ref, () => ({ open: start }), [start]);
+
   useEffect(() => {
     const element = dialog.current;
     if (element === null) return;
@@ -83,16 +121,28 @@ export function GitAliasDialog() {
     }
   }, [open]);
 
-  const close = useCallback(() => setStage({ name: 'closed' }), []);
+  const close = useCallback(() => {
+    request.current++;
+    setStage({ name: 'closed' });
+  }, []);
 
   const install = useCallback(() => {
     setStage((previous) =>
       previous.name === 'confirm' ? { ...previous, installing: true } : previous,
     );
+    const ticket = ++request.current;
     installGitAlias().then(
-      (status) => setStage({ name: 'done', status, already: false }),
-      (thrown: unknown) =>
-        setStage({ name: 'failed', message: AppError.from(thrown).message }),
+      (status) => {
+        // The alias was written whether or not anyone is still watching, so
+        // the listener hears about it even if the dialog has been dismissed.
+        statusListener.current?.(status);
+        if (ticket === request.current)
+          setStage({ name: 'done', status, already: false });
+      },
+      (thrown: unknown) => {
+        if (ticket !== request.current) return;
+        setStage({ name: 'failed', message: AppError.from(thrown).message });
+      },
     );
   }, []);
 

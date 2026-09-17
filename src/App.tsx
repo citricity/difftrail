@@ -13,6 +13,7 @@ import { NavigationControls } from './features/navigation/NavigationControls.tsx
 import { ViewModeToggle } from './features/navigation/ViewModeToggle.tsx';
 import { RepositoryHeader } from './features/repository/RepositoryHeader.tsx';
 import { GitAliasDialog } from './features/gitAlias/GitAliasDialog.tsx';
+import { NotARepository } from './features/gitAlias/NotARepository.tsx';
 import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
@@ -122,10 +123,17 @@ export function App() {
   if (state.phase === 'failed' && state.error !== null) {
     return (
       <div className={styles.app}>
-        <StartupError error={state.error} />
-        {/* Opening Diff Trek from Applications, outside any repository, lands
-            here — which is exactly when installing git dt is wanted. */}
-        <GitAliasDialog />
+        {state.error.kind === 'notARepository' ? (
+          // Opening Diff Trek from Applications, outside any repository, lands
+          // here — which is exactly when installing git dt is wanted. The
+          // screen offers it, and carries the dialog itself.
+          <NotARepository />
+        ) : (
+          <>
+            <StartupError error={state.error} />
+            <GitAliasDialog />
+          </>
+        )}
       </div>
     );
   }

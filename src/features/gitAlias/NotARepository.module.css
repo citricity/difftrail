@@ -1,0 +1,67 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 32px;
+  text-align: center;
+}
+
+.icon {
+  color: var(--text-faint);
+}
+
+.title {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.message {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.screen code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  font-weight: normal;
+  /* "git dt HEAD" is one thing; never break it across lines. */
+  white-space: nowrap;
+}
+
+.button {
+  margin-top: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  cursor: default;
+}
+
+.button:hover {
+  filter: brightness(1.08);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.button code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
