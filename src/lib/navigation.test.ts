@@ -1,5 +1,5 @@
 /**
- * Global navigation order — the behaviour Diff Trail exists to provide.
+ * Global navigation order — the behaviour Diff Trek exists to provide.
  *
  * The scenario from the design notes is the one asserted here: pressing Next
  * Change repeatedly walks foo/0, foo/1, bar/0, baz/0, baz/1 without the

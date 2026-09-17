@@ -1,16 +1,16 @@
 //! End-to-end checks against a real `git` process.
 //!
 //! The unit tests in `git::parse` pin the parser against captured output;
-//! these build an actual repository and assert that Diff Trail reads it the
+//! these build an actual repository and assert that Diff Trek reads it the
 //! way the design requires — in particular that staged changes are excluded
 //! and untracked files never appear.
 
-use diff_trail_lib::git::model::FileStatus;
-use diff_trail_lib::error::ErrorKind;
-use diff_trail_lib::git::repository::{
+use diff_trek_lib::git::model::FileStatus;
+use diff_trek_lib::error::ErrorKind;
+use diff_trek_lib::git::repository::{
     changed_files, discover, file_contents, file_diff, image_bytes, Side, DEFAULT_MAX_DIFF_BYTES,
 };
-use diff_trail_lib::git::revision::{comparison_for, Comparison};
+use diff_trek_lib::git::revision::{comparison_for, Comparison};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -23,14 +23,14 @@ struct Fixture {
 
 impl Fixture {
     fn new(name: &str) -> Self {
-        let root = std::env::temp_dir().join(format!("difftrail-test-{name}-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("difftrek-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("create fixture dir");
 
         let fixture = Self { root };
         fixture.git(&["init", "--quiet", "--initial-branch=main"]);
-        fixture.git(&["config", "user.email", "test@difftrail.local"]);
-        fixture.git(&["config", "user.name", "Diff Trail Test"]);
+        fixture.git(&["config", "user.email", "test@difftrek.local"]);
+        fixture.git(&["config", "user.name", "Diff Trek Test"]);
         fixture
     }
 
@@ -167,7 +167,7 @@ fn shows_the_unstaged_remainder_of_a_partially_staged_file() {
     let added: Vec<&str> = diff.hunks[0]
         .lines
         .iter()
-        .filter(|line| matches!(line.kind, diff_trail_lib::git::model::LineKind::Add))
+        .filter(|line| matches!(line.kind, diff_trek_lib::git::model::LineKind::Add))
         .map(|line| line.content.as_str())
         .collect();
 

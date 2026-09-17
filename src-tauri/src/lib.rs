@@ -42,5 +42,5 @@ pub fn run() {
             commands::set_settings,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Diff Trail");
+        .expect("error while running Diff Trek");
 }

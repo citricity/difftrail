@@ -1,7 +1,7 @@
 //! The application menu.
 //!
 //! Tauri installs `Menu::default()` on macOS by default when the builder is
-//! given no menu of its own, which is why Diff Trail already has a "Diff Trail"
+//! given no menu of its own, which is why Diff Trek already has a "Diff Trek"
 //! menu with About, Services, Hide and Quit, an Edit menu that makes ⌘C work in
 //! the diff, and Window and View menus. None of that is ours.
 //!

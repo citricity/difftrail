@@ -75,7 +75,7 @@ async function readSide(path: string, side: FileSide): Promise<string[] | null> 
   } catch (thrown) {
     // A side that cannot be read is not an error the reader needs to see —
     // the diff itself is unaffected. It only costs this file its context.
-    console.error(`[difftrail] reading ${side} ${path} failed`, thrown);
+    console.error(`[difftrek] reading ${side} ${path} failed`, thrown);
     return null;
   }
 }

@@ -1,7 +1,7 @@
 /**
  * The global change sequence.
  *
- * This is the heart of Diff Trail. Previous/Next Change operate across the
+ * This is the heart of Diff Trek. Previous/Next Change operate across the
  * entire repository diff, so the order is derived from the logical model —
  * never from whatever DOM nodes the virtualiser happens to have rendered.
  *

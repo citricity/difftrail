@@ -1,7 +1,7 @@
 //! Domain types shared between the Git layer and the Tauri command layer.
 //!
 //! These types are serialised straight to the frontend, so the wire shape is
-//! part of Diff Trail's public contract. Keep `rename_all = "camelCase"` in
+//! part of Diff Trek's public contract. Keep `rename_all = "camelCase"` in
 //! sync with `src/types/diff.ts`.
 
 use serde::Serialize;
@@ -120,7 +120,7 @@ pub struct RepositoryInfo {
     /// Abbreviated HEAD commit, or `None` in a repository with no commits.
     pub head: Option<String>,
     pub detached: bool,
-    /// Set when Diff Trail was given a commit or range to show instead of the
+    /// Set when Diff Trek was given a commit or range to show instead of the
     /// working tree.
     pub comparison: Option<ComparisonInfo>,
 }

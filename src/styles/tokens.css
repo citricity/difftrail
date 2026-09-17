@@ -1,5 +1,5 @@
 /**
- * Diff Trail's design system — deliberately this small.
+ * Diff Trek's design system — deliberately this small.
  *
  * Everything visual is expressed as a custom property here, and the
  * virtualiser reads the geometry values back at runtime (see `useRowMetrics`),

@@ -28,7 +28,7 @@ use super::model::ComparisonInfo;
 use crate::error::{AppError, AppResult, ErrorKind};
 use std::path::Path;
 
-/// The two sides of the diff Diff Trail is showing.
+/// The two sides of the diff Diff Trek is showing.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Comparison {
     /// The index against the working tree: a bare `git diff`.
@@ -79,7 +79,7 @@ fn side_or_head(side: &str) -> String {
 pub fn parse(revisions: &[String]) -> AppResult<Option<RevisionSpec>> {
     if let Some(flag) = revisions.iter().find(|arg| arg.starts_with('-')) {
         return Err(invalid(format!(
-            "{flag} is not a revision Diff Trail understands."
+            "{flag} is not a revision Diff Trek understands."
         )));
     }
     if let Some(empty) = revisions.iter().find(|arg| arg.trim().is_empty()) {
@@ -101,7 +101,7 @@ pub fn parse(revisions: &[String]) -> AppResult<Option<RevisionSpec>> {
             }))
         }
         _ => Err(invalid(
-            "Diff Trail takes one commit or range, such as main...HEAD, or two commits.",
+            "Diff Trek takes one commit or range, such as main...HEAD, or two commits.",
         )
         .with_detail(revisions.join(" "))),
     }

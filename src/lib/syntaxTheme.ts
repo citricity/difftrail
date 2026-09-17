@@ -1,5 +1,5 @@
 /**
- * Diff Trail's syntax theme.
+ * Diff Trek's syntax theme.
  *
  * Shiki does the parsing; the colours stay ours. Every scope below resolves to
  * a CSS custom property declared in `styles/tokens.css`, so the palette is part
@@ -20,7 +20,7 @@ import type { ThemeRegistration } from 'shiki/core';
 
 const colour = (name: string): string => `var(--syntax-${name})`;
 
-export const SYNTAX_THEME_NAME = 'difftrail';
+export const SYNTAX_THEME_NAME = 'difftrek';
 
 export const syntaxTheme: ThemeRegistration = {
   name: SYNTAX_THEME_NAME,

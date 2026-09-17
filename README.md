@@ -1,4 +1,4 @@
-# Diff Trail
+# Diff Trek
 
 A fast desktop Git diff viewer. Every changed file appears in **one continuous
 scrolling document**, and Previous/Next Change step through every hunk in the
@@ -6,9 +6,9 @@ entire working-tree diff — crossing file boundaries without the reader having
 to think about them.
 
 That last part is the point. Traditional diff tools scope next/previous-change
-navigation to the file you happen to have open; Diff Trail does not.
+navigation to the file you happen to have open; Diff Trek does not.
 
-*Usage documentation and binaries*: https://citricity.github.io/difftrail/
+*Usage documentation and binaries*: https://citricity.github.io/difftrek/
 
 ## Requirements
 
@@ -30,19 +30,19 @@ Passing `--example` shows that same sample diff in the desktop app instead of
 reading a repository, so it opens anywhere — no Git working tree required:
 
 ```bash
-difftrail --example
+difftrek --example
 pnpm tauri dev -- -- --example   # the same, during development
 ```
 
 The sample is several files, one of them with two hunks, plus a binary file and
 a deleted one — enough to try continuous scrolling and global Previous/Next
-Change against. The repository name reads `difftrail (example)` so it is never
+Change against. The repository name reads `difftrek (example)` so it is never
 mistaken for real changes.
 
-To set up `git dt`, open Diff Trail and choose **Diff Trail > Install 'git dt'
+To set up `git dt`, open Diff Trek and choose **Diff Trek > Install 'git dt'
 Command…** (macOS). It shows the exact `git config --global` command it will run,
 and any `dt` alias it would replace, before running anything. It points the
-alias at the copy of Diff Trail you opened, and warns if that copy is somewhere
+alias at the copy of Diff Trek you opened, and warns if that copy is somewhere
 temporary — a disk image, macOS app translocation, or a debug build.
 
 From a terminal, or on platforms without the menu, the script does the same:
@@ -52,7 +52,7 @@ pnpm tauri build
 ./scripts/install-git-alias.sh
 ```
 
-`git dt` then opens Diff Trail on whichever repository you are standing in. The
+`git dt` then opens Diff Trek on whichever repository you are standing in. The
 alias resolves the repository root itself and passes it as an argument, because
 a macOS `.app` bundle does not inherit the shell's working directory. Anything
 after `git dt` is passed on too, so it can open a commit or a range instead:
@@ -68,14 +68,14 @@ git dt main feature     # the same, as two arguments
 An omitted side of a range is `HEAD` (`git dt main...`). A single commit is
 compared with its first parent, like `git show`; a root commit with nothing.
 Without the alias the revision goes after the repository path:
-`diff-trail /path/to/repo main...HEAD`.
+`diff-trek /path/to/repo main...HEAD`.
 
 An alias installed by an earlier version does not pass arguments on; install it
 again to pick this up.
 
 ## What it shows
 
-Given a commit or range, Diff Trail shows the diff between those two commits,
+Given a commit or range, Diff Trek shows the diff between those two commits,
 read entirely from Git's objects — the index and working tree play no part.
 
 Otherwise it reviews **unstaged changes to tracked files** — exactly what a bare
@@ -88,7 +88,7 @@ Otherwise it reviews **unstaged changes to tracked files** — exactly what a ba
 
 ## Settings
 
-**Diff Trail → Settings…** (⌘,) on macOS, or the gear in the toolbar. They live
+**Diff Trek → Settings…** (⌘,) on macOS, or the gear in the toolbar. They live
 in `settings.json` in the platform's
 own config directory, written through the backend rather than kept in the
 webview, and a missing or damaged file reads as the defaults rather than as an
@@ -146,7 +146,7 @@ and never against the DOM.
 
 ### Rendering
 
-The diff renderer is Diff Trail's own (`features/diff/`), roughly 250 lines
+The diff renderer is Diff Trek's own (`features/diff/`), roughly 250 lines
 over a handful of components. Every row has a known height — a diff line is
 exactly one line tall — so scroll offsets are exact arithmetic rather than
 estimates, and revealing a hunk needs no measurement pass.
@@ -169,7 +169,7 @@ The colours are not Shiki's. `lib/syntaxTheme.ts` maps every scope to a CSS
 custom property, and `styles/tokens.css` defines them — values modelled on
 VS Code's default Light+ and Dark+, sitting alongside the existing diff greens
 and reds. So the palette is retuned in CSS, switches with `prefers-color-scheme`
-without re-tokenising anything, and stays part of Diff Trail's own small design
+without re-tokenising anything, and stays part of Diff Trek's own small design
 system rather than a bundled editor theme.
 
 Three details do the real work:
@@ -204,7 +204,7 @@ Wrapping is off by default. Settings offers two ways to turn it on:
 Settings files from before `auto` existed stored `"wrap": true`; that still
 reads, as a fixed column.
 
-Diff Trail does the wrapping itself rather than handing it to CSS, and the
+Diff Trek does the wrapping itself rather than handing it to CSS, and the
 reason is the scroll model. `white-space: pre-wrap` breaks at word boundaries
 where it can, so the number of visual lines depends on where the spaces fall
 and only the DOM would know it — which is exactly the measurement the
@@ -354,7 +354,7 @@ nothing and reported zero forever, and two fallbacks hid it until the split view
 came to depend on the width alone. These assertions fail on that bug and pass
 without it, which was checked by putting it back.
 
-`DIFFTRAIL_CHROMIUM` overrides the browser path, for images that ship their own
+`DIFFTREK_CHROMIUM` overrides the browser path, for images that ship their own
 Chromium rather than Playwright's.
 
 ### The application icon
@@ -383,7 +383,7 @@ unstaged semantics.
 
 ## Out of scope
 
-Diff Trail is a diff viewer, not a Git GUI. No staging, committing, editing,
+Diff Trek is a diff viewer, not a Git GUI. No staging, committing, editing,
 history browsing, branch management or remote integration.
 
 ## Licence

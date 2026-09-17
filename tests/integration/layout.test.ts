@@ -70,7 +70,7 @@ beforeAll(async () => {
   browser = await chromium.launch({
     // An escape hatch for images that ship their own Chromium rather than
     // Playwright's; unset, Playwright finds the one it installed.
-    executablePath: process.env.DIFFTRAIL_CHROMIUM,
+    executablePath: process.env.DIFFTREK_CHROMIUM,
   });
 
   page = await browser.newPage({ viewport: { width: 1400, height: 900 } });

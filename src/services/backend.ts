@@ -33,7 +33,7 @@ export function isTauri(): boolean {
 /**
  * How the backend was launched, read once.
  *
- * `difftrail --example` serves the built-in sample diff instead of a
+ * `difftrek --example` serves the built-in sample diff instead of a
  * repository — useful for a demo, a screenshot, or working on the UI without
  * arranging a working tree full of changes. Answering it here rather than in
  * Rust means there is one sample to maintain, the one `pnpm dev` already uses,
@@ -49,7 +49,7 @@ let launchOptions: Promise<LaunchOptions> | null = null;
 function getLaunchOptions(): Promise<LaunchOptions> {
   launchOptions ??= invoke<LaunchOptions>('get_launch_options').catch(
     (thrown: unknown) => {
-      console.error('[difftrail] get_launch_options failed', thrown);
+      console.error('[difftrek] get_launch_options failed', thrown);
       return { example: false };
     },
   );
@@ -70,7 +70,7 @@ async function call<T>(
   } catch (thrown) {
     const error = AppError.from(thrown);
     // Keep the full diagnostic out of the UI but available in the console.
-    console.error(`[difftrail] ${command} failed`, error.detail ?? error.message);
+    console.error(`[difftrek] ${command} failed`, error.detail ?? error.message);
     throw error;
   }
 }
@@ -118,12 +118,12 @@ async function onMenuEvent(event: string, handler: () => void): Promise<() => vo
   });
 }
 
-/** Diff Trail > Settings… */
+/** Diff Trek > Settings… */
 export function onSettingsRequested(handler: () => void): Promise<() => void> {
   return onMenuEvent('settings-requested', handler);
 }
 
-/** Diff Trail > Install 'git dt' Command… */
+/** Diff Trek > Install 'git dt' Command… */
 export function onGitAliasRequested(handler: () => void): Promise<() => void> {
   return onMenuEvent('git-alias-requested', handler);
 }
@@ -143,7 +143,7 @@ async function callNative<T>(command: string): Promise<T> {
     return await invoke<T>(command);
   } catch (thrown) {
     const error = AppError.from(thrown);
-    console.error(`[difftrail] ${command} failed`, error.detail ?? error.message);
+    console.error(`[difftrek] ${command} failed`, error.detail ?? error.message);
     throw error;
   }
 }

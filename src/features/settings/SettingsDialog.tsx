@@ -58,7 +58,7 @@ export function SettingsDialog({ state }: Props) {
         // Rejected when the webview lacks the event permission (see
         // src-tauri/capabilities). The menu item then silently does nothing,
         // so at least say why.
-        console.error('[difftrail] could not subscribe to the Settings menu', thrown);
+        console.error('[difftrek] could not subscribe to the Settings menu', thrown);
       },
     );
 

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Diff Trail",
+  "productName": "Diff Trek",
   "version": "0.1.0",
-  "identifier": "city.citri.difftrail",
+  "identifier": "city.citri.difftrek",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Diff Trail",
+        "title": "Diff Trek",
         "width": 1280,
         "height": 860,
         "minWidth": 640,

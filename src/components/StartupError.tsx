@@ -15,7 +15,7 @@ const TITLES: Partial<Record<AppError['kind'], string>> = {
 };
 
 /**
- * Shown when Diff Trail could not start.
+ * Shown when Diff Trek could not start.
  *
  * The user-facing message stays one sentence; the diagnostic detail is
  * available but visually secondary.

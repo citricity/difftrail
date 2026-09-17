@@ -1,5 +1,5 @@
 /**
- * Diff Trail.
+ * Diff Trek.
  *
  * The composition root: it wires loading, navigation and the row model
  * together and hands them to the toolbar and the document. All the interesting
@@ -123,7 +123,7 @@ export function App() {
     return (
       <div className={styles.app}>
         <StartupError error={state.error} />
-        {/* Opening Diff Trail from Applications, outside any repository, lands
+        {/* Opening Diff Trek from Applications, outside any repository, lands
             here — which is exactly when installing git dt is wanted. */}
         <GitAliasDialog />
       </div>

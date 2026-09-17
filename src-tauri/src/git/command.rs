@@ -50,7 +50,7 @@ pub fn run(cwd: &Path, args: &[&str]) -> AppResult<GitOutput> {
 
 /// Escapes a path so Git treats it as a literal, not a glob.
 ///
-/// Diff Trail always passes paths that came out of Git itself, so a path
+/// Diff Trek always passes paths that came out of Git itself, so a path
 /// containing `*` or `[` must not be re-interpreted as a pattern.
 pub fn literal_pathspec(path: &str) -> String {
     format!(":(literal){path}")
