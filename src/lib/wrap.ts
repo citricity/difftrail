@@ -7,7 +7,7 @@
  * the spaces happen to fall, and only the DOM would know.
  *
  * Wrapping at a fixed column instead keeps the arithmetic exact: a line is
- * `ceil(length / column)` rows tall, full stop. Diff Trail does the splitting
+ * `ceil(length / column)` rows tall, full stop. Diff Trek does the splitting
  * itself, which also puts the line numbers and the continuation marker under
  * its control rather than the layout engine's.
  *

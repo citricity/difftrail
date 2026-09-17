@@ -3,7 +3,7 @@
  *
  * Served in two situations, both decided in `backend.ts`: running the UI in a
  * plain browser (`pnpm dev`), where there is no backend to call, and
- * `difftrail --example`, where there is one but the user asked for the sample
+ * `difftrek --example`, where there is one but the user asked for the sample
  * instead. One sample covers both, so there is nothing to keep in step.
  *
  * It is deliberately varied rather than realistic — a multi-hunk file, two
@@ -288,8 +288,8 @@ function sideFor(diff: FileDiff, side: FileSide): string[] | null {
 }
 
 const REPOSITORY: RepositoryInfo = {
-  root: '/Users/you/Development/difftrail',
-  name: 'difftrail (example)',
+  root: '/Users/you/Development/difftrek',
+  name: 'difftrek (example)',
   branch: 'main',
   head: 'a1b2c3d',
   detached: false,
@@ -305,7 +305,7 @@ const REPOSITORY: RepositoryInfo = {
  */
 let settings: Settings = { ...DEFAULT_SETTINGS };
 
-const SAMPLE_BINARY = '/Applications/Diff Trail.app/Contents/MacOS/diff-trail';
+const SAMPLE_BINARY = '/Applications/Diff Trek.app/Contents/MacOS/diff-trek';
 const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" "$@" >/dev/null 2>&1 & }; f`;
 
 /** The `git dt` alias, as far as the browser preview is concerned. */
@@ -391,7 +391,7 @@ async function resolveFixture(
       if (url === undefined) {
         throw new AppError({
           kind: 'binaryFile',
-          message: `${path} is not an image Diff Trail can show.`,
+          message: `${path} is not an image Diff Trek can show.`,
           detail: null,
         });
       }

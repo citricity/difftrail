@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    diff_trail_lib::run();
+    diff_trek_lib::run();
 }

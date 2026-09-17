@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Diff Trail — every change, one continuous document</title>
+    <title>Diff Trek — every change, one continuous document</title>
     <meta
       name="description"
-      content="Diff Trail is a fast desktop Git diff viewer. Every changed file in one scrolling document, with Next and Previous Change crossing file boundaries."
+      content="Diff Trek is a fast desktop Git diff viewer. Every changed file in one scrolling document, with Next and Previous Change crossing file boundaries."
     />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/png" href="images/icon.png" />
@@ -604,13 +604,13 @@
       <div class="wrap wide">
         <a class="brand" href="#top">
           <img src="images/icon.png" alt="" width="28" height="28" />
-          Diff Trail
+          Diff Trek
         </a>
         <nav aria-label="Sections">
           <a href="#install">Install</a>
           <a class="optional" href="#open">Opening a repository</a>
           <a class="optional" href="#review">Reviewing</a>
-          <a href="https://github.com/citricity/difftrail">GitHub</a>
+          <a href="https://github.com/citricity/difftrek">GitHub</a>
         </nav>
       </div>
     </header>
@@ -619,7 +619,7 @@
       <div class="hero">
         <div class="wrap">
           <img class="icon" src="images/icon.png" alt="" width="96" height="96" />
-          <h1>Diff Trail</h1>
+          <h1>Diff Trek</h1>
           <p class="lede">
             Every changed file in one continuous document. Next and Previous Change step
             through the whole diff, straight across file boundaries.
@@ -641,7 +641,7 @@
             <a
               class="button"
               id="download-button"
-              href="https://github.com/citricity/difftrail/releases/latest"
+              href="https://github.com/citricity/difftrek/releases/latest"
             >
               <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
                 <path
@@ -657,7 +657,7 @@
 
             <div class="release-meta">
               <span id="release-version">Latest release</span>
-              <a href="https://github.com/citricity/difftrail/releases">All releases</a>
+              <a href="https://github.com/citricity/difftrek/releases">All releases</a>
             </div>
           </div>
         </div>
@@ -675,7 +675,7 @@
                 src="images/unified-light.webp"
                 width="2400"
                 height="1360"
-                alt="Diff Trail showing several changed files one after another in a single scrolling document, with the current change highlighted."
+                alt="Diff Trek showing several changed files one after another in a single scrolling document, with the current change highlighted."
               />
             </picture>
           </div>
@@ -684,7 +684,7 @@
 
       <div class="wrap">
         <section id="why">
-          <h2>Why Diff Trail</h2>
+          <h2>Why Diff Trek</h2>
           <p>
             Most diff tools scope Next Change to the file you happen to have open. When
             you reach the last change in one file you stop, find the next file, open it,
@@ -692,7 +692,7 @@
             lot of stopping.
           </p>
           <p>
-            Diff Trail treats the whole working-tree diff as one document. Press
+            Diff Trek treats the whole working-tree diff as one document. Press
             <kbd>n</kbd> and you go to the next change, wherever it is. It is a viewer,
             not a Git client: no staging, committing or history, just a fast way to read
             what you have changed before you commit it.
@@ -715,17 +715,17 @@
                 Download the <code>.dmg</code> above. One build runs natively on both
                 Apple silicon and Intel Macs.
               </li>
-              <li>Open it and drag <strong>Diff Trail</strong> into Applications.</li>
-              <li>Open Diff Trail from Applications.</li>
+              <li>Open it and drag <strong>Diff Trek</strong> into Applications.</li>
+              <li>Open Diff Trek from Applications.</li>
             </ol>
             <div class="callout">
               <p>
                 If macOS says it cannot verify the developer, open
                 <strong>System Settings → Privacy &amp; Security</strong>, scroll to the
-                message about Diff Trail and choose <strong>Open Anyway</strong>. You
+                message about Diff Trek and choose <strong>Open Anyway</strong>. You
                 only need to do this once. From a terminal, this does the same:
               </p>
-              <pre><code>xattr -dr com.apple.quarantine "/Applications/Diff Trail.app"</code></pre>
+              <pre><code>xattr -dr com.apple.quarantine "/Applications/Diff Trek.app"</code></pre>
             </div>
           </div>
 
@@ -757,16 +757,16 @@
             <p class="os-label">Linux</p>
             <p>Pick whichever format suits your distribution.</p>
             <h3>AppImage — any distribution</h3>
-            <pre><code>chmod +x Diff.Trail_*_amd64.AppImage
-./Diff.Trail_*_amd64.AppImage</code></pre>
+            <pre><code>chmod +x Diff.Trek_*_amd64.AppImage
+./Diff.Trek_*_amd64.AppImage</code></pre>
             <h3>Debian and Ubuntu</h3>
-            <pre><code>sudo apt install ./Diff.Trail_*_amd64.deb</code></pre>
+            <pre><code>sudo apt install ./Diff.Trek_*_amd64.deb</code></pre>
             <h3>Fedora and openSUSE</h3>
-            <pre><code>sudo dnf install ./Diff.Trail-*.x86_64.rpm</code></pre>
+            <pre><code>sudo dnf install ./Diff.Trek-*.x86_64.rpm</code></pre>
           </div>
 
           <p class="muted" style="margin-top: 24px">
-            Diff Trail needs Git on your <code>PATH</code>, which you almost certainly
+            Diff Trek needs Git on your <code>PATH</code>, which you almost certainly
             already have.
           </p>
         </section>
@@ -774,7 +774,7 @@
         <section id="open">
           <h2>Opening a repository</h2>
           <p>
-            Diff Trail is made to be opened from the repository you are working in. The
+            Diff Trek is made to be opened from the repository you are working in. The
             easiest way is a Git alias, <code>git dt</code>, so that reviewing your
             changes is one command away.
           </p>
@@ -784,15 +784,15 @@
           <div data-os="macos">
             <p class="os-label">macOS</p>
             <p>
-              Open Diff Trail and choose
-              <strong>Diff Trail → Install ‘git dt’ Command…</strong>. It shows you the
+              Open Diff Trek and choose
+              <strong>Diff Trek → Install ‘git dt’ Command…</strong>. It shows you the
               exact <code>git config</code> command it is about to run, and any existing
               <code>dt</code> alias it would replace, before it runs anything.
             </p>
             <p>Or set it yourself from a terminal:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "/Applications/Diff Trail.app/Contents/MacOS/diff-trail" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "/Applications/Diff Trek.app/Contents/MacOS/diff-trek" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
             <p class="muted">
-              Install Diff Trail into Applications first. An alias pointing at the copy
+              Install Diff Trek into Applications first. An alias pointing at the copy
               inside the disk image stops working as soon as the image is ejected.
             </p>
           </div>
@@ -800,7 +800,7 @@
           <div data-os="windows">
             <p class="os-label">Windows</p>
             <p>In Git Bash:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "$LOCALAPPDATA/Diff Trail/diff-trail.exe" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "$LOCALAPPDATA/Diff Trek/diff-trek.exe" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
             <p class="muted">
               Git runs aliases through its own shell, so <code>git dt</code> then works
               from PowerShell and Command Prompt too.
@@ -811,13 +811,13 @@
             <p class="os-label">Linux</p>
             <p>
               For the <code>.deb</code> or <code>.rpm</code>, which install
-              <code>diff-trail</code> onto your <code>PATH</code>:
+              <code>diff-trek</code> onto your <code>PATH</code>:
             </p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; diff-trail "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; diff-trek "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
             <p>
               For the AppImage, put it somewhere permanent first and use its full path
-              in place of <code>diff-trail</code>, for example
-              <code>"$HOME/Applications/Diff.Trail.AppImage"</code>.
+              in place of <code>diff-trek</code>, for example
+              <code>"$HOME/Applications/Diff.Trek.AppImage"</code>.
             </p>
           </div>
 
@@ -840,17 +840,17 @@ git dt v1.0..v2.0       # two commits compared directly</code></pre>
 
           <h3>Without the alias</h3>
           <p>
-            Pass the repository as an argument, or set <code>DIFFTRAIL_REPO</code>. If
-            neither is given, Diff Trail uses the directory it was started from.
+            Pass the repository as an argument, or set <code>DIFFTREK_REPO</code>. If
+            neither is given, Diff Trek uses the directory it was started from.
           </p>
-          <pre><code>diff-trail ~/code/my-project
-diff-trail ~/code/my-project main...HEAD</code></pre>
+          <pre><code>diff-trek ~/code/my-project
+diff-trek ~/code/my-project main...HEAD</code></pre>
 
           <h3>Just looking?</h3>
           <p>
             <code>--example</code> opens a built-in sample diff instead of a repository,
             so you can try everything on this page without a working tree to hand. The
-            header reads <em>difftrail (example)</em> so it is never mistaken for real
+            header reads <em>difftrek (example)</em> so it is never mistaken for real
             changes.
           </p>
         </section>
@@ -858,7 +858,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
         <section id="shows">
           <h2>What it shows</h2>
           <p>
-            Diff Trail shows <strong>unstaged changes to tracked files</strong>: exactly
+            Diff Trek shows <strong>unstaged changes to tracked files</strong>: exactly
             what a bare <code>git diff</code> reports, your working tree compared with
             the index.
           </p>
@@ -915,7 +915,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
             makes that change the current one.
           </p>
           <p>
-            Large repositories open immediately. Diff Trail lists the changed files
+            Large repositories open immediately. Diff Trek lists the changed files
             first and reads each diff as you approach it, so you can start reading while
             the rest loads. A single diff over 2 MB is held back behind a
             <strong>Load anyway</strong> button rather than slowing everything else
@@ -989,7 +989,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
             whole file.
           </p>
           <p class="muted">
-            If a file changes on disk while you are reviewing it, Diff Trail stops
+            If a file changes on disk while you are reviewing it, Diff Trek stops
             offering extra context for it rather than showing lines that may no longer
             be accurate.
           </p>
@@ -1007,7 +1007,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
           <h2>Settings</h2>
           <p>
             Open them with the gear in the toolbar, or on macOS with
-            <strong>Diff Trail → Settings…</strong> (<kbd>⌘</kbd> <kbd>,</kbd>).
+            <strong>Diff Trek → Settings…</strong> (<kbd>⌘</kbd> <kbd>,</kbd>).
           </p>
           <table>
             <thead>
@@ -1037,7 +1037,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
           </table>
           <p style="margin-top: 16px" class="muted">
             Settings are saved to <code>settings.json</code> in your system’s
-            configuration directory. If that file is ever damaged, Diff Trail starts
+            configuration directory. If that file is ever damaged, Diff Trek starts
             with the defaults rather than an error.
           </p>
         </section>
@@ -1046,7 +1046,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
           <h2>Help</h2>
           <h3>“Not a Git repository”</h3>
           <p>
-            Diff Trail was opened somewhere outside a working tree. Use
+            Diff Trek was opened somewhere outside a working tree. Use
             <code>git dt</code> from inside the repository, or pass its path.
           </p>
           <h3>A change I made is missing</h3>
@@ -1057,7 +1057,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
           </p>
           <h3>Something else</h3>
           <p>
-            <a href="https://github.com/citricity/difftrail/issues">Open an issue</a> on
+            <a href="https://github.com/citricity/difftrek/issues">Open an issue</a> on
             GitHub.
           </p>
         </section>
@@ -1069,9 +1069,9 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
         <div class="mascot" aria-hidden="true"></div>
         <p>Congratulations — you’ve reached the end.</p>
         <p>
-          Diff Trail is open source under the MIT licence ·
-          <a href="https://github.com/citricity/difftrail"
-            >github.com/citricity/difftrail</a
+          Diff Trek is open source under the MIT licence ·
+          <a href="https://github.com/citricity/difftrek"
+            >github.com/citricity/difftrek</a
           >
         </p>
       </div>
@@ -1081,7 +1081,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
       (function () {
         'use strict';
 
-        var RELEASES = 'https://github.com/citricity/difftrail/releases';
+        var RELEASES = 'https://github.com/citricity/difftrek/releases';
 
         // What each platform is offered, best first. The first format that the
         // release actually has becomes the main button; the rest are listed
@@ -1115,7 +1115,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
         function detectPlatform() {
           var ua = navigator.userAgent || '';
           // Phones and tablets first: Android reports Linux, and neither can run
-          // Diff Trail. (iPadOS asks for desktop sites as a Mac; that is fine.)
+          // Diff Trek. (iPadOS asks for desktop sites as a Mac; that is fine.)
           if (/Android|iPhone|iPod|iPad/i.test(ua)) return null;
 
           var hints = navigator.userAgentData && navigator.userAgentData.platform;
@@ -1171,7 +1171,7 @@ diff-trail ~/code/my-project main...HEAD</code></pre>
           var platform = PLATFORMS[os];
           note.textContent =
             detected === null && !requested && !picked
-              ? 'Diff Trail is a desktop app — choose the computer you will install it on.'
+              ? 'Diff Trek is a desktop app — choose the computer you will install it on.'
               : platform.note;
 
           alternates.replaceChildren();

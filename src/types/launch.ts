@@ -6,7 +6,7 @@
  */
 export interface LaunchOptions {
   /**
-   * `--example` was passed. Diff Trail serves its built-in sample diff rather
+   * `--example` was passed. Diff Trek serves its built-in sample diff rather
    * than reading a repository, so it opens anywhere — including outside a Git
    * working tree.
    */

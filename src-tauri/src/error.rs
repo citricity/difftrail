@@ -87,7 +87,7 @@ impl AppError {
 
         let message = match kind {
             ErrorKind::NotARepository => "This directory is not inside a Git repository.",
-            ErrorKind::PermissionDenied => "Diff Trail does not have permission to read this file.",
+            ErrorKind::PermissionDenied => "Diff Trek does not have permission to read this file.",
             ErrorKind::EmptyRepository => "This repository has no commits yet.",
             _ => "Git reported an error.",
         };

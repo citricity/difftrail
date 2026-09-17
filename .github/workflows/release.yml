@@ -1,4 +1,4 @@
-# Builds Diff Trail for macOS, Linux and Windows when a GitHub release is
+# Builds Diff Trek for macOS, Linux and Windows when a GitHub release is
 # published, uploads the installers to that release, then redeploys the docs
 # site so its download button points at them.
 #
@@ -145,7 +145,7 @@ jobs:
             config.version = process.env.VERSION;
             fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
           '
-          echo "Building Diff Trail $VERSION"
+          echo "Building Diff Trek $VERSION"
 
       # Signing is optional. With the Apple secrets set, the app is signed with
       # a Developer ID and notarised. Without them it is signed ad hoc, which
@@ -186,7 +186,7 @@ jobs:
         with:
           releaseId: ${{ needs.resolve.outputs.release-id }}
           tagName: ${{ needs.resolve.outputs.tag }}
-          # Diff Trail has no updater, so there is no latest.json or signature
+          # Diff Trek has no updater, so there is no latest.json or signature
           # to publish.
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window's webview may call beyond Diff Trail's own commands. App commands registered with generate_handler! are allowed without listing; core plugin commands are not, and without event listening the Settings menu item has no way to reach the dialog.",
+  "description": "What the main window's webview may call beyond Diff Trek's own commands. App commands registered with generate_handler! are allowed without listing; core plugin commands are not, and without event listening the Settings menu item has no way to reach the dialog.",
   "windows": ["main"],
   "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
 }

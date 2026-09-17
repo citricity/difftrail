@@ -1,5 +1,5 @@
 /**
- * Diff Trail's domain model.
+ * Diff Trek's domain model.
  *
  * These types mirror the Rust structures in `src-tauri/src/git/model.rs`.
  * Keep the two in step: the Rust side serialises with `rename_all = "camelCase"`.
@@ -73,7 +73,7 @@ export interface RepositoryInfo {
   head: string | null;
   detached: boolean;
   /**
-   * Set when Diff Trail was launched with a commit or range
+   * Set when Diff Trek was launched with a commit or range
    * (`git dt main...HEAD`) instead of reviewing the working tree.
    */
   comparison: ComparisonInfo | null;

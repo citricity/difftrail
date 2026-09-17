@@ -42,7 +42,7 @@ export function useSettings(): SettingsState {
         if (alive.current) setLocal(stored);
       } catch (thrown) {
         // Defaults are already on screen; there is nothing to tell the user.
-        console.error('[difftrail] reading preferences failed', thrown);
+        console.error('[difftrek] reading preferences failed', thrown);
       }
     })();
   }, []);

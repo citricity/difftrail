@@ -53,7 +53,7 @@ pub struct AliasStatus {
 }
 
 /// The alias's value: a shell function that finds the repository root and
-/// launches Diff Trail on it in the background.
+/// launches Diff Trek on it in the background.
 ///
 /// `!f() { ...; }; f` is Git's idiom for an alias that needs a real shell. The
 /// root is passed explicitly because a macOS `.app` is not started with the
@@ -90,8 +90,8 @@ fn single_quoted(text: &str) -> String {
 pub fn warning_for(binary: &str) -> Option<String> {
     if binary.contains("/AppTranslocation/") {
         return Some(
-            "macOS is running Diff Trail from a temporary location, which will not \
-             exist next time. Move Diff Trail to Applications, open it from there, \
+            "macOS is running Diff Trek from a temporary location, which will not \
+             exist next time. Move Diff Trek to Applications, open it from there, \
              and install the command again."
                 .into(),
         );
@@ -99,8 +99,8 @@ pub fn warning_for(binary: &str) -> Option<String> {
 
     if binary.starts_with("/Volumes/") {
         return Some(
-            "Diff Trail is running from a disk image. git dt will stop working once \
-             it is ejected — copy Diff Trail to Applications first."
+            "Diff Trek is running from a disk image. git dt will stop working once \
+             it is ejected — copy Diff Trek to Applications first."
                 .into(),
         );
     }
@@ -121,7 +121,7 @@ pub fn current_binary() -> AppResult<String> {
     let path = std::env::current_exe().map_err(|err| {
         AppError::new(
             ErrorKind::GitCommandFailed,
-            "Diff Trail could not work out where it is installed.",
+            "Diff Trek could not work out where it is installed.",
         )
         .with_detail(err.to_string())
     })?;
@@ -132,7 +132,7 @@ pub fn current_binary() -> AppResult<String> {
     path.to_str().map(str::to_owned).ok_or_else(|| {
         AppError::new(
             ErrorKind::GitCommandFailed,
-            "Diff Trail is installed at a path Git cannot store.",
+            "Diff Trek is installed at a path Git cannot store.",
         )
         .with_detail(path.to_string_lossy().into_owned())
     })
@@ -221,9 +221,9 @@ mod tests {
     #[test]
     fn the_value_matches_the_install_script() {
         assert_eq!(
-            alias_value("/Applications/Diff Trail.app/Contents/MacOS/diff-trail"),
+            alias_value("/Applications/Diff Trek.app/Contents/MacOS/diff-trek"),
             "!f() { root=$(git rev-parse --show-toplevel) || exit 1; \
-             \"/Applications/Diff Trail.app/Contents/MacOS/diff-trail\" \"$root\" \"$@\" \
+             \"/Applications/Diff Trek.app/Contents/MacOS/diff-trek\" \"$root\" \"$@\" \
              >/dev/null 2>&1 & }; f"
         );
     }
@@ -240,14 +240,14 @@ mod tests {
 
     #[test]
     fn warns_about_locations_that_will_not_last() {
-        assert!(warning_for("/private/var/folders/x/AppTranslocation/y/d.app/Contents/MacOS/diff-trail")
+        assert!(warning_for("/private/var/folders/x/AppTranslocation/y/d.app/Contents/MacOS/diff-trek")
             .unwrap()
             .contains("Applications"));
-        assert!(warning_for("/Volumes/Diff Trail/Diff Trail.app/Contents/MacOS/diff-trail").is_some());
-        assert!(warning_for("/Users/guy/difftrail/src-tauri/target/debug/diff-trail")
+        assert!(warning_for("/Volumes/Diff Trek/Diff Trek.app/Contents/MacOS/diff-trek").is_some());
+        assert!(warning_for("/Users/guy/difftrek/src-tauri/target/debug/diff-trek")
             .unwrap()
             .contains("dev server"));
-        assert_eq!(warning_for("/Applications/Diff Trail.app/Contents/MacOS/diff-trail"), None);
-        assert_eq!(warning_for("/Users/guy/difftrail/src-tauri/target/release/diff-trail"), None);
+        assert_eq!(warning_for("/Applications/Diff Trek.app/Contents/MacOS/diff-trek"), None);
+        assert_eq!(warning_for("/Users/guy/difftrek/src-tauri/target/release/diff-trek"), None);
     }
 }

@@ -1,6 +1,6 @@
 //! Repository discovery and the working-tree diff.
 //!
-//! Git semantics, stated once: Diff Trail shows **unstaged changes to tracked
+//! Git semantics, stated once: Diff Trek shows **unstaged changes to tracked
 //! files**, which is exactly what a bare `git diff` reports — the index
 //! compared against the working tree. Changes that have been staged are
 //! therefore excluded, and untracked files never appear (v2 feature).
@@ -240,7 +240,7 @@ pub fn image_bytes(
     if !is_image_path(path) {
         return Err(AppError::new(
             ErrorKind::BinaryFile,
-            format!("{path} is not an image Diff Trail can show."),
+            format!("{path} is not an image Diff Trek can show."),
         ));
     }
 
@@ -282,7 +282,7 @@ fn file_bytes(root: &Path, comparison: &Comparison, path: &str, side: Side) -> A
                 std::io::ErrorKind::NotFound => AppError::file_not_found(path),
                 std::io::ErrorKind::PermissionDenied => AppError::new(
                     ErrorKind::PermissionDenied,
-                    format!("Diff Trail cannot read {path}."),
+                    format!("Diff Trek cannot read {path}."),
                 ),
                 _ => AppError::new(
                     ErrorKind::GitCommandFailed,
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn discover_rejects_a_path_that_does_not_exist() {
-        let error = discover(Path::new("/definitely/not/here/difftrail")).unwrap_err();
+        let error = discover(Path::new("/definitely/not/here/difftrek")).unwrap_err();
         assert_eq!(error.kind, ErrorKind::NotARepository);
     }
 }

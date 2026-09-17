@@ -16,7 +16,7 @@ usage() {
 Usage: install-git-alias.sh [--local] [--binary PATH]
 
   --local        Install the alias for the current repository only.
-  --binary PATH  Path to the Diff Trail executable. Auto-detected if omitted.
+  --binary PATH  Path to the Diff Trek executable. Auto-detected if omitted.
 USAGE
 }
 
@@ -31,10 +31,10 @@ done
 
 if [[ -z "$BINARY" ]]; then
   CANDIDATES=(
-    "/Applications/Diff Trail.app/Contents/MacOS/diff-trail"
-    "$HOME/Applications/Diff Trail.app/Contents/MacOS/diff-trail"
-    "$(dirname "$0")/../src-tauri/target/release/diff-trail"
-    "$(dirname "$0")/../src-tauri/target/debug/diff-trail"
+    "/Applications/Diff Trek.app/Contents/MacOS/diff-trek"
+    "$HOME/Applications/Diff Trek.app/Contents/MacOS/diff-trek"
+    "$(dirname "$0")/../src-tauri/target/release/diff-trek"
+    "$(dirname "$0")/../src-tauri/target/debug/diff-trek"
   )
 
   for candidate in "${CANDIDATES[@]}"; do
@@ -46,7 +46,7 @@ if [[ -z "$BINARY" ]]; then
 fi
 
 if [[ -z "$BINARY" ]]; then
-  echo "Could not find the Diff Trail executable." >&2
+  echo "Could not find the Diff Trek executable." >&2
   echo "Build it with 'pnpm tauri build', or pass --binary PATH." >&2
   exit 1
 fi

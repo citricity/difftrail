@@ -23,7 +23,7 @@ vi.mock('../../services/backend.ts', () => ({
 
 const { GitAliasDialog } = await import('./GitAliasDialog.tsx');
 
-/** Renders the dialog and chooses Diff Trail > Install 'git dt' Command… */
+/** Renders the dialog and chooses Diff Trek > Install 'git dt' Command… */
 async function openFromMenu() {
   render(<GitAliasDialog />);
   // The subscription resolves on a microtask.
@@ -34,7 +34,7 @@ async function openFromMenu() {
 }
 
 const STATUS: GitAliasStatus = {
-  binary: '/Applications/Diff Trail.app/Contents/MacOS/diff-trail',
+  binary: '/Applications/Diff Trek.app/Contents/MacOS/diff-trek',
   command: "git config --global alias.dt '!f() { … }; f'",
   existing: null,
   installed: false,

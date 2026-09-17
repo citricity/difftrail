@@ -23,7 +23,7 @@ type Stage =
  * Changing someone's global Git configuration is not something to do on a
  * click alone, so the dialog first reads what would happen — the exact command,
  * the executable it points at, any `dt` alias it would replace, and any reason
- * this copy of Diff Trail is a poor thing to point at — and runs nothing until
+ * this copy of Diff Trek is a poor thing to point at — and runs nothing until
  * the user presses Install.
  *
  * The status is read afresh on every opening, since the configuration can
@@ -58,10 +58,7 @@ export function GitAliasDialog() {
         else unlisten = off;
       },
       (thrown: unknown) => {
-        console.error(
-          '[difftrail] could not subscribe to the git dt menu item',
-          thrown,
-        );
+        console.error('[difftrek] could not subscribe to the git dt menu item', thrown);
       },
     );
 
@@ -128,10 +125,10 @@ export function GitAliasDialog() {
             <p>
               This adds a Git alias to your global Git configuration, so that running{' '}
               <code>git dt</code> in any repository opens its unstaged changes in Diff
-              Trail, and <code>git dt main...HEAD</code> opens a commit or range.
+              Trek, and <code>git dt main...HEAD</code> opens a commit or range.
             </p>
 
-            <p className={styles.label}>Diff Trail will run:</p>
+            <p className={styles.label}>Diff Trek will run:</p>
             <pre className={styles.code}>{stage.status.command}</pre>
 
             {stage.status.existing !== null && (
@@ -156,7 +153,7 @@ export function GitAliasDialog() {
             <p className={styles.success}>
               {stage.already ? (
                 <>
-                  <code>git dt</code> is already set up for this copy of Diff Trail.
+                  <code>git dt</code> is already set up for this copy of Diff Trek.
                 </>
               ) : (
                 <>
@@ -166,7 +163,7 @@ export function GitAliasDialog() {
             </p>
             <p>
               In any Git repository, run <code>git dt</code> to see its unstaged changes
-              in Diff Trail. Add a commit or range to see that instead, as in{' '}
+              in Diff Trek. Add a commit or range to see that instead, as in{' '}
               <code>git dt HEAD~1</code> or <code>git dt main...HEAD</code>.
             </p>
             {stage.status.warning !== null && (

@@ -4,7 +4,7 @@
 //! actually matters — defaults, clamping, and what a damaged file does — is
 //! testable without a running app.
 //!
-//! Nothing here is allowed to stop Diff Trail starting. A missing file, an
+//! Nothing here is allowed to stop Diff Trek starting. A missing file, an
 //! unreadable one, or one holding nonsense all resolve to the defaults, because
 //! a preference is never worth an error screen in front of the diff.
 
@@ -133,7 +133,7 @@ pub fn load_from(path: &Path) -> Settings {
         Err(err) => {
             // Worth saying out loud — the next save overwrites it — but not
             // worth refusing to start over.
-            eprintln!("[difftrail] ignoring unreadable {}: {err}", path.display());
+            eprintln!("[difftrek] ignoring unreadable {}: {err}", path.display());
             Settings::default()
         }
     }
@@ -165,7 +165,7 @@ pub fn save_to(path: &Path, settings: Settings) -> AppResult<()> {
 fn write_error(path: &Path, err: std::io::Error) -> AppError {
     AppError::new(
         ErrorKind::SettingsFailed,
-        "Diff Trail could not save your settings.",
+        "Diff Trek could not save your settings.",
     )
     .with_detail(format!("{}: {err}", path.display()))
 }
@@ -175,7 +175,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("difftrail-settings-{name}"));
+        let dir = std::env::temp_dir().join(format!("difftrek-settings-{name}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

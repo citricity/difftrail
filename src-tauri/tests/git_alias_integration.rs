@@ -7,7 +7,7 @@
 
 #![cfg(unix)]
 
-use diff_trail_lib::git_alias::{alias_value, install, status, ConfigTarget};
+use diff_trek_lib::git_alias::{alias_value, install, status, ConfigTarget};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ fn git(cwd: &Path, args: &[&str]) {
 }
 
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("difftrail-alias-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("difftrek-alias-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     // Canonical, because on macOS the temp dir is behind a symlink and
@@ -32,10 +32,10 @@ fn scratch(name: &str) -> PathBuf {
 fn installs_an_alias_that_launches_the_binary_on_the_repository_root() {
     let base = scratch("run");
 
-    let tools = base.join(r#"Diff "Trail" $HOME"#);
+    let tools = base.join(r#"Diff "Trek" $HOME"#);
     fs::create_dir_all(&tools).unwrap();
     let record = base.join("launched-with.txt");
-    let binary = tools.join("diff-trail");
+    let binary = tools.join("diff-trek");
     fs::write(
         &binary,
         format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n", record.display()),
@@ -84,10 +84,10 @@ fn replaces_an_existing_dt_alias_and_reports_it_first() {
     fs::write(&config, "[alias]\n\tdt = difftool --dir-diff\n").unwrap();
     let target = ConfigTarget::File(config);
 
-    let before = status("/opt/diff-trail", &target).unwrap();
+    let before = status("/opt/diff-trek", &target).unwrap();
     assert_eq!(before.existing.as_deref(), Some("difftool --dir-diff"));
     assert!(!before.installed);
 
-    assert!(install("/opt/diff-trail", &target).unwrap().installed);
+    assert!(install("/opt/diff-trek", &target).unwrap().installed);
     let _ = fs::remove_dir_all(&base);
 }

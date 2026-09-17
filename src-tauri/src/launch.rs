@@ -1,4 +1,4 @@
-//! Working out what Diff Trail was asked to open.
+//! Working out what Diff Trek was asked to open.
 //!
 //! Kept separate from the Tauri command layer so the precedence rules are
 //! testable without a running app.
@@ -18,7 +18,7 @@ const EXAMPLE_FLAG: &str = "--example";
 #[serde(rename_all = "camelCase")]
 pub struct LaunchOptions {
     /// `--example` was passed. The frontend then answers every request from
-    /// its own sample data and never calls the Git commands, so Diff Trail
+    /// its own sample data and never calls the Git commands, so Diff Trek
     /// opens anywhere — including outside a repository.
     pub example: bool,
 }
@@ -38,18 +38,18 @@ pub(crate) fn options_from(mut args: impl Iterator<Item = String>) -> LaunchOpti
 pub struct LaunchTarget {
     pub directory: PathBuf,
     /// Everything after the repository path, still unparsed:
-    /// `difftrail /repo main...HEAD`. Empty for the working tree.
+    /// `difftrek /repo main...HEAD`. Empty for the working tree.
     pub revisions: Vec<String>,
 }
 
 /// Resolves the repository to inspect, and any revisions to compare in it.
 ///
 /// Precedence for the repository: an explicit path argument
-/// (`difftrail /path/to/repo`), then `DIFFTRAIL_REPO`, then the process working
+/// (`difftrek /path/to/repo`), then `DIFFTREK_REPO`, then the process working
 /// directory. The `git dt` alias passes the root explicitly, because a macOS
 /// `.app` bundle does not inherit the shell's working directory, and forwards
 /// its own arguments after it — so `git dt main...HEAD` arrives as
-/// `difftrail /repo main...HEAD`.
+/// `difftrek /repo main...HEAD`.
 ///
 /// The first positional argument is always the repository, so a revision can
 /// only be given after a path. That is what keeps a branch that happens to
@@ -60,7 +60,7 @@ pub struct LaunchTarget {
 pub fn launch_target() -> LaunchTarget {
     target_from(
         std::env::args().skip(1),
-        std::env::var_os("DIFFTRAIL_REPO"),
+        std::env::var_os("DIFFTREK_REPO"),
         std::env::current_dir().ok(),
     )
 }

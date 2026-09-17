@@ -298,6 +298,6 @@ export async function prepareSyntax(
       highlightHunk(highlighterCore, language, hunk);
     }
   } catch (thrown) {
-    console.error(`[difftrail] highlighting ${diff.path} failed`, thrown);
+    console.error(`[difftrek] highlighting ${diff.path} failed`, thrown);
   }
 }

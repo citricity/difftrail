@@ -1,14 +1,14 @@
-# Diff Trail — Project Overview
+# Diff Trek — Project Overview
 
 ## Purpose
 
-**Diff Trail** is a simple, fast desktop Git diff viewer designed to improve on the workflow of tools such as Beyond Compare when reviewing a whole working-tree diff.
+**Diff Trek** is a simple, fast desktop Git diff viewer designed to improve on the workflow of tools such as Beyond Compare when reviewing a whole working-tree diff.
 
 The key UX requirement is:
 
 > Show the diffs for multiple changed files in one continuous scrolling view, while allowing the user to step through every individual change across every file using global Previous/Next Change controls.
 
-Diff Trail should feel closer to a modern code-review interface than a traditional file-by-file diff application.
+Diff Trek should feel closer to a modern code-review interface than a traditional file-by-file diff application.
 
 ---
 
@@ -96,7 +96,7 @@ Examples of appropriate Base UI usage include:
 - popovers
 - selects
 
-Do not treat Base UI as the foundation of the application. Most of Diff Trail's interface should be built using ordinary React components and CSS.
+Do not treat Base UI as the foundation of the application. Most of Diff Trek's interface should be built using ordinary React components and CSS.
 
 For example, a toolbar button should normally just be a native button:
 
@@ -127,7 +127,7 @@ The application is intentionally small enough that a large design system would c
 
 ### Visual style
 
-Diff Trail should look like a focused desktop developer tool rather than a web application.
+Diff Trek should look like a focused desktop developer tool rather than a web application.
 
 Good visual references are:
 
@@ -187,7 +187,7 @@ For example:
 
 These exact values can change.
 
-The important point is to keep the visual system small, explicit and owned by Diff Trail rather than outsourcing it to a large third-party design system.
+The important point is to keep the visual system small, explicit and owned by Diff Trek rather than outsourcing it to a large third-party design system.
 
 ---
 
@@ -208,7 +208,7 @@ It was preferred over:
 
 The main reason is virtualisation/performance for large diffs.
 
-However, the architecture should avoid depending too heavily on a particular diff component. Diff Trail should own its diff/file model and treat the renderer as a replaceable UI layer.
+However, the architecture should avoid depending too heavily on a particular diff component. Diff Trek should own its diff/file model and treat the renderer as a replaceable UI layer.
 
 ---
 
@@ -493,7 +493,7 @@ Comments should explain **why**, not restate obvious code.
 
 ---
 
-## How Diff Trail is launched
+## How Diff Trek is launched
 
 The intention is for installation to add a Git alias such as:
 
@@ -501,7 +501,7 @@ The intention is for installation to add a Git alias such as:
 git dt
 ```
 
-The command will launch Diff Trail using the **current working directory** as the repository to inspect.
+The command will launch Diff Trek using the **current working directory** as the repository to inspect.
 
 For the MVP, assume the command is executed from somewhere inside a Git repository.
 
@@ -526,7 +526,7 @@ Conceptually this produces two directory trees:
 - A: the HEAD / repository version
 - B: the current working-tree version
 
-Diff Trail can then compare corresponding files.
+Diff Trek can then compare corresponding files.
 
 It is not mandatory that the final implementation literally relies on the temporary directories created by `git difftool`; if direct Git commands produce a cleaner implementation, that is acceptable. Preserve the intended semantics rather than blindly preserving the command.
 
@@ -562,7 +562,7 @@ For very large files/diffs, the architecture should support chunked or increment
 
 An earlier idea was to process files in parallel batches, e.g. roughly five concurrent files, and cache generated diff data in a temporary directory. That is still a reasonable implementation technique, but should only be used where it actually improves performance.
 
-Avoid eagerly diffing every large file before Diff Trail becomes usable.
+Avoid eagerly diffing every large file before Diff Trek becomes usable.
 
 Fast initial display is more important.
 
@@ -643,9 +643,9 @@ baz.ts / hunk 1
 baz.ts / hunk 2
 ```
 
-The transition between files should be invisible from the user's perspective: Diff Trail simply scrolls to the next changed block.
+The transition between files should be invisible from the user's perspective: Diff Trek simply scrolls to the next changed block.
 
-This behaviour is one of the primary reasons for building Diff Trail.
+This behaviour is one of the primary reasons for building Diff Trek.
 
 Traditional diff tools tend to scope next/previous-change navigation to the currently opened file, which is specifically what this project is trying to avoid.
 
@@ -655,7 +655,7 @@ Keyboard shortcuts should eventually support the same operation.
 
 ## Scrolling and virtualisation
 
-The user should perceive Diff Trail as a single continuous document even if the implementation uses virtualisation underneath.
+The user should perceive Diff Trek as a single continuous document even if the implementation uses virtualisation underneath.
 
 Because repositories can contain very large diffs, do not render every line of every file into the DOM simultaneously.
 
@@ -745,7 +745,7 @@ src/foo.ts:hunk:1
 src/bar.ts:hunk:0
 ```
 
-Diff Trail can then maintain a flattened navigation index:
+Diff Trek can then maintain a flattened navigation index:
 
 ```ts
 type ChangeLocation = {
@@ -812,12 +812,12 @@ Exact API design can evolve.
 
 ## Initial startup behaviour
 
-Diff Trail should become useful quickly.
+Diff Trek should become useful quickly.
 
 A good sequence would be:
 
 ```text
-Launch Diff Trail
+Launch Diff Trek
 
 ↓ approximately immediately
 
@@ -882,7 +882,7 @@ Do not spend time initially implementing:
 - complex preference screens
 - plugin systems
 
-Diff Trail is primarily a **diff viewer**, not a Git GUI.
+Diff Trek is primarily a **diff viewer**, not a Git GUI.
 
 ---
 
@@ -968,4 +968,4 @@ When making implementation decisions, optimise in roughly this order:
 
 Avoid adding functionality simply because typical Git GUI applications contain it.
 
-The narrowness of **Diff Trail** is intentional.
+The narrowness of **Diff Trek** is intentional.
