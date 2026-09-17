@@ -33,7 +33,11 @@ import {
 import type { RowMetrics, RowModel } from '../../lib/rows.ts';
 import { runsForContextLine, runsForLine } from '../../lib/rowRuns.ts';
 import { buildNavigationIndex, sameLocation } from '../../lib/navigation.ts';
-import { buildScrollStops, changeInView } from '../../lib/scrollFollow.ts';
+import {
+  buildScrollStops,
+  changeInView,
+  followedStopReplaced,
+} from '../../lib/scrollFollow.ts';
 import type {
   ChangeLocation,
   DiffHunk,
@@ -201,6 +205,8 @@ export function DiffDocument({
   }, []);
 
   const lastRevealed = useRef<string | null>(null);
+  /** The location following last handed to navigation, until a reveal. */
+  const followed = useRef<ChangeLocation | null>(null);
 
   const stops = useMemo(
     () => buildScrollStops(model, buildNavigationIndex(files)),
@@ -235,6 +241,7 @@ export function DiffDocument({
     // Mark it revealed, or the reveal effect would scroll it to the reading
     // line — pulling the view out from under the reader.
     lastRevealed.current = `${location.fileId}|${location.hunkId ?? ''}|${latest.revealRequest}`;
+    followed.current = location;
     latest.onScrollToChange(location);
   }, []);
 
@@ -293,6 +300,7 @@ export function DiffDocument({
     if (offset === null) return;
 
     lastRevealed.current = key;
+    followed.current = null;
     // A frame still waiting to follow a scroll made before this reveal would
     // otherwise follow the reveal instead.
     readerScrolled.current = false;
@@ -379,6 +387,24 @@ export function DiffDocument({
       onScrollToChange,
     };
   });
+
+  /**
+   * Works the current change out again when the file the scroll stopped on
+   * finishes loading.
+   *
+   * Scrolling onto a file that has not loaded can only name the file. When its
+   * diff arrives that stop is replaced by the file's hunks, and a location still
+   * naming the file has no place in the sequence. The anchoring above has kept
+   * the reader's place, so the reading line picks the hunk they are looking at.
+   *
+   * Only a stop following published is revisited, so a rebuild still never
+   * cancels a pending Next or a jump from the file list.
+   */
+  useEffect(() => {
+    if (!followedStopReplaced(followed.current, follow.current.current, stops)) return;
+    followed.current = null;
+    followScroll(liveScrollTop.current);
+  }, [stops, followScroll]);
 
   const range = visibleRange(model, scrollTop, viewportHeight, OVERSCAN);
   const endHeight = endOfDocumentHeight(viewportHeight, metrics);

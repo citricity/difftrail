@@ -109,3 +109,31 @@ export function changeInView(
 
   return above === -1 ? null : stops[above].location;
 }
+
+/**
+ * Whether a file-level stop the scroll handed to navigation has since been
+ * replaced by that file's hunks, so the current change must be worked out again.
+ *
+ * A pending file is one stop; once its diff lands the stop is gone, and a
+ * location still naming it has no position — the readout shows "–" and Next
+ * starts over from the top. Only a location that following published, and that
+ * is still current, is taken back: anything navigation chose since is left to
+ * navigation.
+ */
+export function followedStopReplaced(
+  followed: ChangeLocation | null,
+  current: ChangeLocation | null,
+  stops: ScrollStop[],
+): boolean {
+  if (followed === null || followed.hunkId !== null) return false;
+  if (
+    current === null ||
+    current.fileId !== followed.fileId ||
+    current.hunkId !== null
+  ) {
+    return false;
+  }
+  return !stops.some(
+    (stop) => stop.location.fileId === followed.fileId && stop.location.hunkId === null,
+  );
+}

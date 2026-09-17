@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { buildNavigationIndex } from './navigation.ts';
 import { buildRowModel } from './rows.ts';
 import type { RowMetrics } from './rows.ts';
-import { buildScrollStops, changeInView } from './scrollFollow.ts';
+import {
+  buildScrollStops,
+  changeInView,
+  followedStopReplaced,
+} from './scrollFollow.ts';
 import { loadedFile, pendingFile } from '../test/factories.ts';
 import type { DocumentFile } from '../types/index.ts';
 
@@ -94,5 +98,27 @@ describe('changeInView', () => {
 
   it('has nothing to say about an empty document', () => {
     expect(changeInView([], 0, 500)).toBeNull();
+  });
+});
+
+describe('followedStopReplaced', () => {
+  const pending = stopsFor([pendingFile('a.ts'), loadedFile('b.ts', 1)]).stops;
+  const loaded = stopsFor([loadedFile('a.ts', 2), loadedFile('b.ts', 1)]).stops;
+  const fileStop = { fileId: 'a.ts', hunkId: null };
+
+  it('is true once a followed pending file has expanded into its hunks', () => {
+    expect(followedStopReplaced(fileStop, fileStop, pending)).toBe(false);
+    expect(followedStopReplaced(fileStop, fileStop, loaded)).toBe(true);
+  });
+
+  it('leaves alone a location navigation has chosen since', () => {
+    const hunk = { fileId: 'b.ts', hunkId: 'b.ts:hunk:0' };
+    expect(followedStopReplaced(fileStop, hunk, loaded)).toBe(false);
+    expect(followedStopReplaced(null, fileStop, loaded)).toBe(false);
+  });
+
+  it('only concerns file-level stops', () => {
+    const hunk = { fileId: 'a.ts', hunkId: 'a.ts:hunk:0' };
+    expect(followedStopReplaced(hunk, hunk, pending)).toBe(false);
   });
 });
