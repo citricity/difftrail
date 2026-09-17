@@ -53,7 +53,7 @@ pub struct AliasStatus {
 }
 
 /// The alias's value: a shell function that finds the repository root and
-/// launches Diff Trek on it in the background.
+/// launches Diff Trek on it.
 ///
 /// `!f() { ...; }; f` is Git's idiom for an alias that needs a real shell. The
 /// root is passed explicitly because a macOS `.app` is not started with the
@@ -61,11 +61,38 @@ pub struct AliasStatus {
 /// is the error the user should see rather than an empty window. Git hands the
 /// alias's own arguments to `f`, and `"$@"` passes them on after the root, so
 /// `git dt main...HEAD` opens that range.
+///
+/// Inside a `.app` bundle the launch goes through `open -n` rather than
+/// running the executable. A process the terminal starts directly is not a
+/// launch the user asked for as far as macOS is concerned, so since macOS 14
+/// its window opens behind the terminal and is refused focus. LaunchServices
+/// launches are, so the window comes to the front. `-n` keeps one process per
+/// `git dt`, as running the executable did, and `open` returns at once, so
+/// nothing is backgrounded.
 pub fn alias_value(binary: &str) -> String {
-    format!(
-        "!f() {{ root=$(git rev-parse --show-toplevel) || exit 1; \"{}\" \"$root\" \"$@\" >/dev/null 2>&1 & }}; f",
-        escape_double_quoted(binary)
-    )
+    let launch = match app_bundle(binary) {
+        Some(bundle) => format!(
+            "open -n \"{}\" --args \"$root\" \"$@\";",
+            escape_double_quoted(bundle)
+        ),
+        None => format!(
+            "\"{}\" \"$root\" \"$@\" >/dev/null 2>&1 &",
+            escape_double_quoted(binary)
+        ),
+    };
+    format!("!f() {{ root=$(git rev-parse --show-toplevel) || exit 1; {launch} }}; f")
+}
+
+/// The `.app` bundle an executable is the main binary of:
+/// `/Applications/Diff Trek.app` for
+/// `/Applications/Diff Trek.app/Contents/MacOS/diff-trek`.
+fn app_bundle(binary: &str) -> Option<&str> {
+    const INSIDE: &str = "/Contents/MacOS/";
+    let index = binary.rfind(INSIDE)?;
+    let bundle = &binary[..index];
+    let executable = &binary[index + INSIDE.len()..];
+    (bundle.ends_with(".app") && !executable.is_empty() && !executable.contains('/'))
+        .then_some(bundle)
 }
 
 /// Escapes text for use inside a double-quoted POSIX shell string, where only
@@ -219,13 +246,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_value_matches_the_install_script() {
+    fn an_app_bundle_is_launched_through_open_so_it_takes_focus() {
         assert_eq!(
             alias_value("/Applications/Diff Trek.app/Contents/MacOS/diff-trek"),
             "!f() { root=$(git rev-parse --show-toplevel) || exit 1; \
-             \"/Applications/Diff Trek.app/Contents/MacOS/diff-trek\" \"$root\" \"$@\" \
-             >/dev/null 2>&1 & }; f"
+             open -n \"/Applications/Diff Trek.app\" --args \"$root\" \"$@\"; }; f"
         );
+    }
+
+    #[test]
+    fn a_bare_executable_is_run_directly_in_the_background() {
+        assert_eq!(
+            alias_value("/usr/bin/diff-trek"),
+            "!f() { root=$(git rev-parse --show-toplevel) || exit 1; \
+             \"/usr/bin/diff-trek\" \"$root\" \"$@\" >/dev/null 2>&1 & }; f"
+        );
+    }
+
+    #[test]
+    fn finds_the_bundle_only_for_its_main_executable() {
+        assert_eq!(
+            app_bundle("/Applications/Diff Trek.app/Contents/MacOS/diff-trek"),
+            Some("/Applications/Diff Trek.app")
+        );
+        assert_eq!(app_bundle("/Users/guy/difftrek/src-tauri/target/debug/diff-trek"), None);
+        assert_eq!(app_bundle("/opt/Contents/MacOS/diff-trek"), None);
+        assert_eq!(app_bundle("/Applications/Diff Trek.app/Contents/MacOS/"), None);
+        assert_eq!(app_bundle("/A.app/Contents/MacOS/nested/diff-trek"), None);
     }
 
     #[test]
