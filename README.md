@@ -54,11 +54,31 @@ pnpm tauri build
 
 `git dt` then opens Diff Trail on whichever repository you are standing in. The
 alias resolves the repository root itself and passes it as an argument, because
-a macOS `.app` bundle does not inherit the shell's working directory.
+a macOS `.app` bundle does not inherit the shell's working directory. Anything
+after `git dt` is passed on too, so it can open a commit or a range instead:
+
+```bash
+git dt                  # unstaged changes
+git dt HEAD~1           # one commit's own changes (also abc123^!)
+git dt main...HEAD      # what this branch changed since it left main
+git dt v1.0..v2.0       # straight comparison of two commits
+git dt main feature     # the same, as two arguments
+```
+
+An omitted side of a range is `HEAD` (`git dt main...`). A single commit is
+compared with its first parent, like `git show`; a root commit with nothing.
+Without the alias the revision goes after the repository path:
+`diff-trail /path/to/repo main...HEAD`.
+
+An alias installed by an earlier version does not pass arguments on; install it
+again to pick this up.
 
 ## What it shows
 
-Diff Trail reviews **unstaged changes to tracked files** — exactly what a bare
+Given a commit or range, Diff Trail shows the diff between those two commits,
+read entirely from Git's objects — the index and working tree play no part.
+
+Otherwise it reviews **unstaged changes to tracked files** — exactly what a bare
 `git diff` reports, the index compared against the working tree. So:
 
 - staged changes are excluded; if a file is partly staged you see only the

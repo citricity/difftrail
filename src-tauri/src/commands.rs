@@ -8,7 +8,8 @@ use crate::error::{AppError, AppResult, ErrorKind};
 use crate::git::model::{ChangedFile, FileDiff, RepositoryInfo};
 use crate::git_alias::{self, AliasStatus, ConfigTarget};
 use crate::git::repository::{self, Side, DEFAULT_MAX_DIFF_BYTES};
-use crate::launch::{self, resolve_launch_directory, LaunchOptions};
+use crate::git::revision::{self, Comparison};
+use crate::launch::{self, launch_target, LaunchOptions};
 use crate::settings::{self, Settings};
 use crate::state::AppState;
 use tauri::{Manager, Runtime, State};
@@ -56,18 +57,27 @@ pub fn get_launch_options() -> LaunchOptions {
     launch::launch_options()
 }
 
+/// Opens the repository, and resolves any commit or range it was launched
+/// with. A revision that does not resolve fails here, so it reaches the
+/// startup error screen rather than an empty diff.
 #[tauri::command]
 pub fn get_repository_info(state: State<'_, AppState>) -> AppResult<RepositoryInfo> {
-    let start = resolve_launch_directory();
-    let root = repository::discover(&start)?;
-    state.set_root(root.clone());
-    repository::info(&root)
+    let target = launch_target();
+    let root = repository::discover(&target.directory)?;
+
+    let (comparison, info) = match revision::comparison_for(&root, &target.revisions)? {
+        Some(resolved) => (resolved.comparison, Some(resolved.info)),
+        None => (Comparison::WorkingTree, None),
+    };
+
+    state.set_root(root.clone(), comparison);
+    repository::info(&root, info)
 }
 
 #[tauri::command]
 pub fn get_changed_files(state: State<'_, AppState>) -> AppResult<Vec<ChangedFile>> {
     let root = state.root()?;
-    let files = repository::changed_files(&root)?;
+    let files = repository::changed_files(&root, &state.comparison())?;
     state.set_files(files.clone());
     Ok(files)
 }
@@ -84,7 +94,12 @@ pub fn get_file_diff(
 ) -> AppResult<FileDiff> {
     let root = state.root()?;
     let meta = state.file(&path)?;
-    repository::file_diff(&root, &meta, max_bytes.unwrap_or(DEFAULT_MAX_DIFF_BYTES))
+    repository::file_diff(
+        &root,
+        &state.comparison(),
+        &meta,
+        max_bytes.unwrap_or(DEFAULT_MAX_DIFF_BYTES),
+    )
 }
 
 #[tauri::command]
@@ -103,7 +118,15 @@ pub fn get_file_contents(
         ));
     }
 
-    repository::file_contents(&root, &path, Side::parse(&side)?)
+    // The original side of a rename is read from the path it had before, as
+    // images already were; between commits a rename is the common case.
+    let side = Side::parse(&side)?;
+    let source = match side {
+        Side::Original => meta.old_path.as_deref().unwrap_or(&meta.path),
+        Side::Working => &meta.path,
+    };
+
+    repository::file_contents(&root, &state.comparison(), source, side)
 }
 
 /// One side of a changed image, as raw bytes.
@@ -127,7 +150,8 @@ pub fn get_image_bytes(
         Side::Working => &meta.path,
     };
 
-    repository::image_bytes(&root, source, side).map(tauri::ipc::Response::new)
+    repository::image_bytes(&root, &state.comparison(), source, side)
+        .map(tauri::ipc::Response::new)
 }
 
 /// What installing the `git dt` alias would do: the command, the executable it

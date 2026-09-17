@@ -3,7 +3,7 @@
 //! The unit tests pin the string; this pins what matters, which is that Git
 //! stores it and a shell runs it with the executable's path intact. The
 //! executable here is a stand-in script whose path contains a space, a double
-//! quote and a `$`, and which records the argument it was given.
+//! quote and a `$`, and which records the arguments it was given.
 
 #![cfg(unix)]
 
@@ -38,7 +38,7 @@ fn installs_an_alias_that_launches_the_binary_on_the_repository_root() {
     let binary = tools.join("diff-trail");
     fs::write(
         &binary,
-        format!("#!/bin/sh\nprintf '%s' \"$1\" > '{}'\n", record.display()),
+        format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n", record.display()),
     )
     .unwrap();
     fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
@@ -59,8 +59,9 @@ fn installs_an_alias_that_launches_the_binary_on_the_repository_root() {
     assert!(after.installed);
     assert_eq!(after.existing.as_deref(), Some(alias_value(&binary).as_str()));
 
-    // Run from a subdirectory: the alias must pass the root, not where we are.
-    git(&repo.join("nested/deeper"), &["dt"]);
+    // Run from a subdirectory: the alias must pass the root, not where we are,
+    // then the alias's own arguments intact — one with a space in it.
+    git(&repo.join("nested/deeper"), &["dt", "main...HEAD", "two words"]);
 
     // The alias backgrounds the launch, so wait for it.
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -69,7 +70,10 @@ fn installs_an_alias_that_launches_the_binary_on_the_repository_root() {
     }
     std::thread::sleep(Duration::from_millis(100));
 
-    assert_eq!(fs::read_to_string(&record).unwrap(), repo.to_str().unwrap());
+    assert_eq!(
+        fs::read_to_string(&record).unwrap(),
+        format!("{}\nmain...HEAD\ntwo words\n", repo.to_str().unwrap())
+    );
     let _ = fs::remove_dir_all(&base);
 }
 

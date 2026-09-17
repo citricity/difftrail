@@ -1,5 +1,5 @@
-//! Process-wide state: which repository we opened, and the changed-file list
-//! we last read from it.
+//! Process-wide state: which repository we opened, what it is being compared
+//! across, and the changed-file list we last read from it.
 //!
 //! The file list is cached because every `get_file_diff` call needs the
 //! metadata (status, rename pair, binary flag) for the path it was given, and
@@ -7,6 +7,7 @@
 
 use crate::error::{AppError, AppResult};
 use crate::git::model::ChangedFile;
+use crate::git::revision::Comparison;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -18,14 +19,22 @@ pub struct AppState {
 #[derive(Default)]
 struct Inner {
     root: Option<PathBuf>,
+    comparison: Comparison,
     files: Vec<ChangedFile>,
 }
 
 impl AppState {
-    pub fn set_root(&self, root: PathBuf) {
+    /// Opens a repository, and what to compare in it. Always set together, so
+    /// a root can never be paired with another repository's commits.
+    pub fn set_root(&self, root: PathBuf, comparison: Comparison) {
         let mut inner = self.lock();
         inner.root = Some(root);
+        inner.comparison = comparison;
         inner.files.clear();
+    }
+
+    pub fn comparison(&self) -> Comparison {
+        self.lock().comparison.clone()
     }
 
     pub fn root(&self) -> AppResult<PathBuf> {
@@ -78,7 +87,7 @@ mod tests {
         let state = AppState::default();
         assert!(state.root().is_err());
 
-        state.set_root(PathBuf::from("/tmp/repo"));
+        state.set_root(PathBuf::from("/tmp/repo"), Comparison::WorkingTree);
         assert_eq!(state.root().unwrap(), PathBuf::from("/tmp/repo"));
     }
 
@@ -95,7 +104,7 @@ mod tests {
     fn changing_repository_clears_stale_file_list() {
         let state = AppState::default();
         state.set_files(vec![file("a.ts")]);
-        state.set_root(PathBuf::from("/tmp/other"));
+        state.set_root(PathBuf::from("/tmp/other"), Comparison::WorkingTree);
 
         assert!(state.file("a.ts").is_err());
     }

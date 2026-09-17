@@ -128,7 +128,7 @@ export function GitAliasDialog() {
             <p>
               This adds a Git alias to your global Git configuration, so that running{' '}
               <code>git dt</code> in any repository opens its unstaged changes in Diff
-              Trail.
+              Trail, and <code>git dt main...HEAD</code> opens a commit or range.
             </p>
 
             <p className={styles.label}>Diff Trail will run:</p>
@@ -166,7 +166,8 @@ export function GitAliasDialog() {
             </p>
             <p>
               In any Git repository, run <code>git dt</code> to see its unstaged changes
-              in Diff Trail.
+              in Diff Trail. Add a commit or range to see that instead, as in{' '}
+              <code>git dt HEAD~1</code> or <code>git dt main...HEAD</code>.
             </p>
             {stage.status.warning !== null && (
               <p className={styles.warning} role="note">

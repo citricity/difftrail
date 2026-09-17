@@ -8,6 +8,7 @@ export type AppErrorKind =
   | 'permissionDenied'
   | 'invalidDiff'
   | 'gitCommandFailed'
+  | 'invalidRevision'
   | 'settingsFailed';
 
 /** The serialised error shape every Tauri command rejects with. */

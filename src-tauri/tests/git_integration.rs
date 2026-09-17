@@ -6,12 +6,16 @@
 //! and untracked files never appear.
 
 use diff_trail_lib::git::model::FileStatus;
+use diff_trail_lib::error::ErrorKind;
 use diff_trail_lib::git::repository::{
-    changed_files, discover, file_diff, image_bytes, Side, DEFAULT_MAX_DIFF_BYTES,
+    changed_files, discover, file_contents, file_diff, image_bytes, Side, DEFAULT_MAX_DIFF_BYTES,
 };
+use diff_trail_lib::git::revision::{comparison_for, Comparison};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+const WT: Comparison = Comparison::WorkingTree;
 
 struct Fixture {
     root: PathBuf,
@@ -57,6 +61,31 @@ impl Fixture {
         self.git(&["commit", "--quiet", "-m", message]);
     }
 
+    fn rev(&self, name: &str) -> String {
+        let output = Command::new("git")
+            .args(["rev-parse", name])
+            .current_dir(&self.root)
+            .output()
+            .expect("run git");
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn compare(&self, revisions: &[&str]) -> Comparison {
+        let revisions: Vec<String> = revisions.iter().map(|r| r.to_string()).collect();
+        comparison_for(&self.root, &revisions)
+            .expect("resolve revisions")
+            .expect("a comparison")
+            .comparison
+    }
+
+    fn paths(&self, comparison: &Comparison) -> Vec<String> {
+        changed_files(&self.root, comparison)
+            .expect("list changed files")
+            .into_iter()
+            .map(|file| file.path)
+            .collect()
+    }
+
     fn path(&self) -> &Path {
         &self.root
     }
@@ -91,7 +120,7 @@ fn reports_unstaged_modifications_to_tracked_files() {
     fixture.commit_all("initial");
     fixture.write("a.txt", "one\nTWO\nthree\n");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
 
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].path, "a.txt");
@@ -111,7 +140,7 @@ fn excludes_staged_changes() {
     fixture.git(&["add", "staged.txt"]);
     fixture.write("unstaged.txt", "changed only on disk\n");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
     let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
 
     assert_eq!(
@@ -131,10 +160,10 @@ fn shows_the_unstaged_remainder_of_a_partially_staged_file() {
     fixture.git(&["add", "a.txt"]);
     fixture.write("a.txt", "ONE\nTWO\n");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
     assert_eq!(files.len(), 1);
 
-    let diff = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let diff = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
     let added: Vec<&str> = diff.hunks[0]
         .lines
         .iter()
@@ -155,7 +184,7 @@ fn ignores_untracked_files() {
     fixture.write("tracked.txt", "edited\n");
     fixture.write("brand-new.txt", "never added\n");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
     let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
 
     assert_eq!(paths, vec!["tracked.txt"]);
@@ -168,12 +197,12 @@ fn reports_deleted_tracked_files() {
     fixture.commit_all("initial");
     fs::remove_file(fixture.path().join("gone.txt")).expect("delete file");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
 
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].status, FileStatus::Deleted);
 
-    let diff = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let diff = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
     assert_eq!(diff.deletions, 2);
     assert_eq!(diff.additions, 0);
 }
@@ -194,8 +223,8 @@ fn parses_multiple_hunks_with_stable_ids_and_correct_line_numbers() {
         .collect();
     fixture.write("big.txt", &edited);
 
-    let files = changed_files(fixture.path()).expect("list changed files");
-    let diff = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
+    let diff = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
 
     // Two edits, far enough apart that Git emits two separate hunks.
     assert_eq!(diff.hunks.len(), 2);
@@ -220,13 +249,13 @@ fn flags_binary_files_without_attempting_to_parse_them() {
     fixture.commit_all("initial");
     fs::write(fixture.path().join("blob.bin"), [9u8, 9, 9, 0, 1, 2, 3]).expect("edit binary");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
 
     assert_eq!(files.len(), 1);
     assert!(files[0].binary);
     assert_eq!(files[0].additions, None);
 
-    let diff = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let diff = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
     assert!(diff.binary);
     assert!(diff.hunks.is_empty());
 }
@@ -238,7 +267,7 @@ fn handles_paths_with_spaces_and_non_ascii_characters() {
     fixture.commit_all("initial");
     fixture.write("src/my file — ünicode.txt", "two\n");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
 
     assert_eq!(files.len(), 1);
     assert_eq!(
@@ -246,7 +275,7 @@ fn handles_paths_with_spaces_and_non_ascii_characters() {
         "core.quotepath=false must keep the path readable"
     );
 
-    let diff = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let diff = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
     assert_eq!(diff.hunks.len(), 1);
 }
 
@@ -259,14 +288,14 @@ fn truncates_a_diff_that_exceeds_the_byte_budget() {
     let huge: String = (0..5000).map(|n| format!("generated line {n}\n")).collect();
     fixture.write("big.txt", &huge);
 
-    let files = changed_files(fixture.path()).expect("list changed files");
-    let diff = file_diff(fixture.path(), &files[0], 1024).expect("load diff");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
+    let diff = file_diff(fixture.path(), &WT, &files[0], 1024).expect("load diff");
 
     assert!(diff.truncated);
     assert!(diff.hunks.is_empty(), "a truncated diff carries no hunks");
 
     // The same file loads fine when the budget allows it.
-    let full = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let full = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
     assert!(!full.truncated);
     assert!(!full.hunks.is_empty());
 }
@@ -278,8 +307,8 @@ fn reports_a_file_with_no_trailing_newline() {
     fixture.commit_all("initial");
     fixture.write("a.txt", "one\ntwo");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
-    let diff = file_diff(fixture.path(), &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
+    let diff = file_diff(fixture.path(), &WT, &files[0], DEFAULT_MAX_DIFF_BYTES).expect("load diff");
 
     let last = diff.hunks[0].lines.last().expect("a last line");
     assert_eq!(last.content, "two");
@@ -292,7 +321,7 @@ fn an_unchanged_repository_reports_no_files() {
     fixture.write("a.txt", "one\n");
     fixture.commit_all("initial");
 
-    let files = changed_files(fixture.path()).expect("list changed files");
+    let files = changed_files(fixture.path(), &WT).expect("list changed files");
     assert!(files.is_empty());
 }
 
@@ -309,6 +338,137 @@ fn reads_both_sides_of_a_changed_image_byte_for_byte() {
     fs::write(fixture.path().join("icon.png"), after).unwrap();
 
     let root = discover(fixture.path()).unwrap();
-    assert_eq!(image_bytes(&root, "icon.png", Side::Original).unwrap(), before);
-    assert_eq!(image_bytes(&root, "icon.png", Side::Working).unwrap(), after);
+    assert_eq!(image_bytes(&root, &WT, "icon.png", Side::Original).unwrap(), before);
+    assert_eq!(image_bytes(&root, &WT, "icon.png", Side::Working).unwrap(), after);
+}
+
+// ---------------------------------------------------------------------------
+// Commits and ranges from the command line.
+
+/// main: base.txt. feature, branched from main: feature.txt, then another
+/// commit changing it. main then moves on with main-only.txt, so `..` and `...`
+/// disagree about it.
+fn branched() -> Fixture {
+    let fixture = Fixture::new(&format!("branched-{}", std::thread::current().name().unwrap_or("t").replace("::", "-")));
+    fixture.write("base.txt", "base\n");
+    fixture.commit_all("base");
+
+    fixture.git(&["checkout", "--quiet", "-b", "feature"]);
+    fixture.write("feature.txt", "one\n");
+    fixture.commit_all("add feature");
+    fixture.write("feature.txt", "one\ntwo\n");
+    fixture.commit_all("extend feature");
+
+    fixture.git(&["checkout", "--quiet", "main"]);
+    fixture.write("main-only.txt", "main\n");
+    fixture.commit_all("main moves on");
+    fixture.git(&["checkout", "--quiet", "feature"]);
+    fixture
+}
+
+#[test]
+fn a_single_commit_shows_only_its_own_changes() {
+    let fixture = branched();
+    // Uncommitted work must not leak into a commit's diff.
+    fixture.write("feature.txt", "dirty\n");
+
+    let comparison = fixture.compare(&["HEAD"]);
+    assert_eq!(fixture.paths(&comparison), vec!["feature.txt"]);
+
+    let files = changed_files(fixture.path(), &comparison).unwrap();
+    let diff = file_diff(fixture.path(), &comparison, &files[0], DEFAULT_MAX_DIFF_BYTES).unwrap();
+    assert_eq!((diff.additions, diff.deletions), (1, 0));
+    assert_eq!(diff.hunks[0].lines.last().unwrap().content, "two");
+
+    // `^!` is the same thing.
+    assert_eq!(fixture.compare(&["HEAD^!"]), comparison);
+}
+
+#[test]
+fn a_root_commit_is_compared_against_nothing() {
+    let fixture = branched();
+    let root_commit = fixture.rev("main~1");
+    let comparison = fixture.compare(&[&root_commit]);
+    let files = changed_files(fixture.path(), &comparison).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "base.txt");
+    assert_eq!(files[0].status, FileStatus::Added);
+}
+
+#[test]
+fn three_dots_show_what_the_branch_changed_since_it_diverged() {
+    let fixture = branched();
+    let comparison = fixture.compare(&["main...HEAD"]);
+    assert_eq!(fixture.paths(&comparison), vec!["feature.txt"]);
+}
+
+#[test]
+fn two_dots_and_two_arguments_compare_the_commits_directly() {
+    let fixture = branched();
+    let comparison = fixture.compare(&["main..HEAD"]);
+    // main-only.txt exists on main but not feature, so it reads as deleted.
+    assert_eq!(fixture.paths(&comparison), vec!["feature.txt", "main-only.txt"]);
+    assert_eq!(fixture.compare(&["main", "HEAD"]), comparison);
+}
+
+#[test]
+fn an_omitted_side_of_a_range_is_head() {
+    let fixture = branched();
+    assert_eq!(fixture.compare(&["main..."]), fixture.compare(&["main...HEAD"]));
+}
+
+#[test]
+fn whole_files_are_read_from_the_commits_not_the_disk() {
+    let fixture = branched();
+    fixture.write("feature.txt", "dirty\n");
+    let comparison = fixture.compare(&["HEAD"]);
+
+    assert_eq!(
+        file_contents(fixture.path(), &comparison, "feature.txt", Side::Original).unwrap(),
+        "one\n"
+    );
+    assert_eq!(
+        file_contents(fixture.path(), &comparison, "feature.txt", Side::Working).unwrap(),
+        "one\ntwo\n"
+    );
+}
+
+#[test]
+fn a_rename_between_commits_reads_its_old_path_on_the_original_side() {
+    let fixture = branched();
+    fixture.git(&["mv", "feature.txt", "renamed.txt"]);
+    fixture.commit_all("rename");
+
+    let comparison = fixture.compare(&["HEAD"]);
+    let files = changed_files(fixture.path(), &comparison).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].status, FileStatus::Renamed);
+    assert_eq!(files[0].old_path.as_deref(), Some("feature.txt"));
+    assert_eq!(
+        file_contents(fixture.path(), &comparison, "feature.txt", Side::Original).unwrap(),
+        "one\ntwo\n"
+    );
+}
+
+#[test]
+fn an_unknown_revision_is_reported_as_such() {
+    let fixture = branched();
+    for revisions in [vec!["nope".to_string()], vec!["main...nope".to_string()]] {
+        let error = comparison_for(fixture.path(), &revisions).unwrap_err();
+        assert_eq!(error.kind, ErrorKind::InvalidRevision, "{revisions:?}");
+        assert!(error.message.contains("nope"), "{}", error.message);
+    }
+}
+
+#[test]
+fn unrelated_histories_have_no_merge_base() {
+    let fixture = branched();
+    fixture.git(&["checkout", "--quiet", "--orphan", "lonely"]);
+    fixture.git(&["rm", "-rf", "--quiet", "."]);
+    fixture.write("lonely.txt", "alone\n");
+    fixture.commit_all("unrelated");
+
+    let error = comparison_for(fixture.path(), &["main...lonely".to_string()]).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::InvalidRevision);
+    assert!(error.message.contains("no common ancestor"), "{}", error.message);
 }

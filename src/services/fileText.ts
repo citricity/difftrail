@@ -91,10 +91,10 @@ async function readSide(path: string, side: FileSide): Promise<string[] | null> 
 export async function loadFileText(diff: FileDiff): Promise<FileText | null> {
   if (diff.binary || diff.truncated || diff.hunks.length === 0) return null;
 
+  // Both sides are requested by the file's current path, which is how the
+  // backend knows it; the backend reads a rename's original from `oldPath`.
   const [original, working] = await Promise.all([
-    diff.status === 'added'
-      ? Promise.resolve(null)
-      : readSide(diff.oldPath ?? diff.path, 'original'),
+    diff.status === 'added' ? Promise.resolve(null) : readSide(diff.path, 'original'),
     diff.status === 'deleted' ? Promise.resolve(null) : readSide(diff.path, 'working'),
   ]);
 

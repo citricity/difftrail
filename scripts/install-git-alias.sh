@@ -58,9 +58,10 @@ fi
 
 # `!f() { ...; }; f` is git's idiom for an alias that needs a real shell.
 # `git rev-parse --show-toplevel` fails outside a repository, which is the
-# error the user should see rather than an empty window.
+# error the user should see rather than an empty window. "$@" forwards the
+# alias's own arguments, so `git dt main...HEAD` opens that range.
 git config "$SCOPE" alias.dt \
-  "!f() { root=\$(git rev-parse --show-toplevel) || exit 1; \"$BINARY\" \"\$root\" >/dev/null 2>&1 & }; f"
+  "!f() { root=\$(git rev-parse --show-toplevel) || exit 1; \"$BINARY\" \"\$root\" \"\$@\" >/dev/null 2>&1 & }; f"
 
 echo "Installed: git dt"
 echo "  binary: $BINARY"

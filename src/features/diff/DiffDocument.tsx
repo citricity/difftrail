@@ -70,6 +70,12 @@ interface Props {
   metrics: RowMetrics;
   /** True until the changed-file list has arrived. */
   loading: boolean;
+  /**
+   * The commit or range being shown, as typed; null for the working tree;
+   * undefined until the repository has resolved and it is not yet known.
+   * Only the loading and empty states need to know.
+   */
+  comparison?: string | null;
   current: ChangeLocation | null;
   /**
    * Bumped when the view must be brought to `current` even though it has not
@@ -105,6 +111,7 @@ export function DiffDocument({
   model,
   metrics,
   loading,
+  comparison,
   current,
   revealRequest,
   onSelect,
@@ -633,7 +640,9 @@ export function DiffDocument({
       <div className={styles.container}>
         <div className={styles.empty}>
           {loading ? (
-            <span>Reading the working tree…</span>
+            <span>
+              {comparison === null ? 'Reading the working tree…' : 'Reading the diff…'}
+            </span>
           ) : (
             <>
               {/* Only here, with nothing to review: a hedgehog with the day off. */}
@@ -644,8 +653,17 @@ export function DiffDocument({
                 }
                 aria-hidden="true"
               />
-              <span className={styles.emptyTitle}>No unstaged changes</span>
-              <span>Every tracked file matches the index.</span>
+              {typeof comparison !== 'string' ? (
+                <>
+                  <span className={styles.emptyTitle}>No unstaged changes</span>
+                  <span>Every tracked file matches the index.</span>
+                </>
+              ) : (
+                <>
+                  <span className={styles.emptyTitle}>No changes in {comparison}</span>
+                  <span>Both sides of the comparison are identical.</span>
+                </>
+              )}
             </>
           )}
         </div>

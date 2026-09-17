@@ -120,4 +120,20 @@ pub struct RepositoryInfo {
     /// Abbreviated HEAD commit, or `None` in a repository with no commits.
     pub head: Option<String>,
     pub detached: bool,
+    /// Set when Diff Trail was given a commit or range to show instead of the
+    /// working tree.
+    pub comparison: Option<ComparisonInfo>,
+}
+
+/// A commit or range from the command line, for the header.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComparisonInfo {
+    /// The arguments as typed, e.g. `main...HEAD`.
+    pub label: String,
+    /// Abbreviated base commit; `None` when the target is a root commit and is
+    /// compared against nothing.
+    pub base: Option<String>,
+    /// Abbreviated target commit.
+    pub target: String,
 }

@@ -11,6 +11,7 @@ const TITLES: Partial<Record<AppError['kind'], string>> = {
   gitUnavailable: 'Git not found',
   emptyRepository: 'Nothing to compare against',
   permissionDenied: 'Permission denied',
+  invalidRevision: 'Cannot show that revision',
 };
 
 /**

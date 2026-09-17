@@ -145,6 +145,11 @@ export function App() {
         model={model}
         metrics={metrics}
         loading={state.phase === 'starting'}
+        comparison={
+          state.repository === null
+            ? undefined
+            : (state.repository.comparison?.label ?? null)
+        }
         current={navigation.current}
         revealRequest={navigation.revealRequest}
         onSelect={navigation.goTo}

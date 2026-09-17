@@ -72,6 +72,21 @@ export interface RepositoryInfo {
   /** `null` in a repository with no commits. */
   head: string | null;
   detached: boolean;
+  /**
+   * Set when Diff Trail was launched with a commit or range
+   * (`git dt main...HEAD`) instead of reviewing the working tree.
+   */
+  comparison: ComparisonInfo | null;
+}
+
+/** A commit or range given on the command line. */
+export interface ComparisonInfo {
+  /** The arguments as typed, e.g. `main...HEAD`. */
+  label: string;
+  /** Abbreviated base commit; `null` for a root commit, compared against nothing. */
+  base: string | null;
+  /** Abbreviated target commit. */
+  target: string;
 }
 
 /** Which side of the comparison to read whole-file contents from. */

@@ -790,7 +790,7 @@
               <code>dt</code> alias it would replace, before it runs anything.
             </p>
             <p>Or set it yourself from a terminal:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "/Applications/Diff Trail.app/Contents/MacOS/diff-trail" "$root" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "/Applications/Diff Trail.app/Contents/MacOS/diff-trail" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
             <p class="muted">
               Install Diff Trail into Applications first. An alias pointing at the copy
               inside the disk image stops working as soon as the image is ejected.
@@ -800,7 +800,7 @@
           <div data-os="windows">
             <p class="os-label">Windows</p>
             <p>In Git Bash:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "$LOCALAPPDATA/Diff Trail/diff-trail.exe" "$root" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "$LOCALAPPDATA/Diff Trail/diff-trail.exe" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
             <p class="muted">
               Git runs aliases through its own shell, so <code>git dt</code> then works
               from PowerShell and Command Prompt too.
@@ -813,7 +813,7 @@
               For the <code>.deb</code> or <code>.rpm</code>, which install
               <code>diff-trail</code> onto your <code>PATH</code>:
             </p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; diff-trail "$root" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; diff-trail "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
             <p>
               For the AppImage, put it somewhere permanent first and use its full path
               in place of <code>diff-trail</code>, for example
@@ -829,13 +829,22 @@ git dt</code></pre>
             working tree. Outside a repository it says so rather than opening an empty
             window.
           </p>
+          <p>Give it a commit or a range to review that instead:</p>
+          <pre><code>git dt HEAD~1           # one commit's own changes
+git dt main...HEAD      # what this branch changed since it left main
+git dt v1.0..v2.0       # two commits compared directly</code></pre>
+          <p class="muted">
+            Set the alias up before this version? Install it again: the old one does
+            not pass arguments on.
+          </p>
 
           <h3>Without the alias</h3>
           <p>
             Pass the repository as an argument, or set <code>DIFFTRAIL_REPO</code>. If
             neither is given, Diff Trail uses the directory it was started from.
           </p>
-          <pre><code>diff-trail ~/code/my-project</code></pre>
+          <pre><code>diff-trail ~/code/my-project
+diff-trail ~/code/my-project main...HEAD</code></pre>
 
           <h3>Just looking?</h3>
           <p>
@@ -865,6 +874,11 @@ git dt</code></pre>
           <p class="muted">
             That makes staging a way of marking progress: <code>git add</code> what you
             have reviewed, reopen, and what is left is what still needs a look.
+          </p>
+          <p>
+            Opened with a commit or range, such as <code>git dt main...HEAD</code>, it
+            shows the changes between those commits instead, and the header names the
+            range in place of the branch.
           </p>
         </section>
 

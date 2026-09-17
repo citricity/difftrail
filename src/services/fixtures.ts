@@ -293,6 +293,7 @@ const REPOSITORY: RepositoryInfo = {
   branch: 'main',
   head: 'a1b2c3d',
   detached: false,
+  comparison: null,
 };
 
 /**
@@ -305,7 +306,7 @@ const REPOSITORY: RepositoryInfo = {
 let settings: Settings = { ...DEFAULT_SETTINGS };
 
 const SAMPLE_BINARY = '/Applications/Diff Trail.app/Contents/MacOS/diff-trail';
-const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" >/dev/null 2>&1 & }; f`;
+const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" "$@" >/dev/null 2>&1 & }; f`;
 
 /** The `git dt` alias, as far as the browser preview is concerned. */
 let gitAlias: GitAliasStatus = {

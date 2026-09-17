@@ -24,6 +24,8 @@ pub enum ErrorKind {
     InvalidDiff,
     /// Git ran and failed for a reason we do not specifically recognise.
     GitCommandFailed,
+    /// A commit or range given on the command line does not resolve.
+    InvalidRevision,
     /// Preferences could not be written. Never raised on read — an unreadable
     /// settings file falls back to the defaults instead.
     SettingsFailed,
