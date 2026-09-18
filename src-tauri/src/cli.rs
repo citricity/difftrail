@@ -76,19 +76,44 @@ fn create_changelog(author: &str) -> i32 {
 /// carries the detail that changes with the format.
 fn instructions(nonce: &str, hunks: usize) -> String {
     format!(
-        "{hunks} hunk(s) to explain. Fill in each placeholder:\n\n    \
-         ~~DIFFTREK_AI:{nonce}:HUNK_REASON id=hN~~\n    \
-         why this hunk exists — not what it does, the diff shows that\n    \
-         ~~DIFFTREK_AI:{nonce}:/HUNK_REASON id=hN~~\n\n\
-         Group the hunks belonging to one intent by wrapping them in\n    \
-         ~~DIFFTREK_AI:{nonce}:LOGICAL_CHANGE_START id=0 /~~ … \
-         ~~DIFFTREK_AI:{nonce}:LOGICAL_CHANGE_END id=0 /~~\n\
-         and describe each id in the LOGICAL_CHANGE_TABLE block. A span may open\n\
-         and close more than once, which is how one intent covers hunks 1 and 3\n\
-         but not 2, and how it gets markers in each file it touches.\n\n\
-         Edit only inside the tag blocks. Never retype the diff — one altered\n\
-         space unmatches a hunk and loses its note — and do not quote a live\n\
-         {nonce} tag inside a reason, which would end the block early."
+        "\
+{hunks} hunk(s) to explain.
+
+1. Give every hunk a reason. Fill in each placeholder with why that hunk
+   exists — not what it does, the diff shows that:
+
+    ~~DIFFTREK_AI:{nonce}:HUNK_REASON id=hN~~
+    why this hunk exists
+    ~~DIFFTREK_AI:{nonce}:/HUNK_REASON id=hN~~
+
+2. Put every hunk inside at least one logical change — one intent, covering
+   however many hunks serve it:
+
+    ~~DIFFTREK_AI:{nonce}:LOGICAL_CHANGE_START id=0 /~~
+    … the hunks that serve it …
+    ~~DIFFTREK_AI:{nonce}:LOGICAL_CHANGE_END id=0 /~~
+
+   A hunk joins whichever spans are open when its @@ line is read, so open a
+   span above an @@ line and close it after the last line of the hunk it
+   ends. A span may open and close more than once, which is how one intent
+   covers hunks 1 and 3 but not 2, and how it gets its own markers in each
+   file it touches. Spans may overlap, so a hunk can serve two intents.
+
+   Leave no hunk outside every span. A hunk that shares its intent with no
+   other hunk still gets a span of its own, and unrelated hunks are never
+   grouped together to avoid one.
+
+3. Describe every id you opened in the LOGICAL_CHANGE_TABLE block:
+
+    [{{\"id\": \"0\", \"description\": \"…\", \"associatedIssues\": []}}]
+
+   The description is a headline: one sentence saying what the change sets
+   out to do, short enough to read in a list. The reasoning belongs in the
+   hunk reasons, not here.
+
+Edit only inside the tag blocks. Never retype the diff — one altered space
+unmatches a hunk and loses its note — and do not quote a live {nonce} tag
+inside a reason, which would end the block early."
     )
 }
 
@@ -115,5 +140,30 @@ mod tests {
         assert!(text.contains("~~DIFFTREK_AI:AB99X7:HUNK_REASON id=hN~~"));
         assert!(text.contains("3 hunk(s)"));
         assert!(text.contains("Never retype the diff"));
+        assert!(text.contains("Leave no hunk outside every span"));
+    }
+
+    /// The script has to print the same instructions as the app: an agent in a
+    /// container and an agent on the desktop must write the same file. The
+    /// prose is duplicated because the script runs where this crate cannot.
+    #[test]
+    fn the_script_prints_the_same_instructions() {
+        let script = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../scripts/difftrek-changelog.sh"
+        ))
+        .expect("scripts/difftrek-changelog.sh");
+
+        const OPEN: &str = "cat <<INSTRUCTIONS\n";
+        let body = &script[script.find(OPEN).expect("the heredoc") + OPEN.len()..];
+        let end = body.find("\nINSTRUCTIONS\n").expect("the heredoc terminator");
+
+        // The heredoc is unquoted, so the shell expands these as it prints.
+        let printed = body[..end]
+            .replace("$MARKER", "~~DIFFTREK_AI")
+            .replace("$nonce", "AB99X7")
+            .replace("$hunks", "3");
+
+        assert_eq!(printed, instructions("AB99X7", 3));
     }
 }

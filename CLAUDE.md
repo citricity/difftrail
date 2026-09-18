@@ -980,7 +980,10 @@ When you have finished a piece of work, record why you made each change.
    and then run difftrek-changelog.sh directly.
 2. That file is the diff with a placeholder after every hunk. Fill each one in
    with **why** that hunk exists — not what it does, the diff already shows that.
-3. Where several hunks serve one intent, wrap them in a LOGICAL_CHANGE span and
-   describe it in the LOGICAL_CHANGE_TABLE block.
+3. Group the hunks into logical changes: wrap the hunks serving one intent in
+   a LOGICAL_CHANGE span and describe it in the LOGICAL_CHANGE_TABLE block.
+   Every hunk must sit inside at least one span — a hunk that shares its intent
+   with no other still gets a span of its own — so the logical changes together
+   cover the whole diff.
 4. Edit only inside the tag blocks. Never retype or reformat the diff itself:
    one altered space unmatches a hunk and loses its note.
