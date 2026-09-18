@@ -295,6 +295,25 @@ export function ungroupedHunks(
 }
 
 /**
+ * Labels for every logical change, in the order the reader meets them.
+ *
+ * First appearance rather than the changelog's table, because the labels are
+ * read down the gutter and along the bar: a table written in another order
+ * would open the document on B. Changes the table declares but the document
+ * never shows are labelled after the rest, so they still have a name in a
+ * dialog without taking a letter from a change that is on screen.
+ */
+export function labelChanges(
+  changes: readonly ChangeEntry[],
+  tableIds: readonly string[],
+): Map<string, string> {
+  const seen = changes.map((entry) => entry.id);
+  const rest = tableIds.filter((id) => !seen.includes(id));
+
+  return new Map([...seen, ...rest].map((id, index) => [id, changeLabel(index)]));
+}
+
+/**
  * A, B … Z, AA, AB … — spreadsheet columns.
  *
  * Bijective base 26, so the labels never run out. Wrapping at 26 would give

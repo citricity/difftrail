@@ -32,6 +32,7 @@ import {
   documentOrder,
   fileOfHunk,
   focusFilter,
+  labelChanges,
   stepChange,
 } from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
@@ -177,18 +178,6 @@ export function App() {
   /** Which note dialog is open, if any. */
   const [noteDialog, setNoteDialog] = useState<NoteDialog>(null);
 
-  const documentNotes = useMemo(() => {
-    if (changelog.changelog === null) return null;
-
-    return {
-      hunks: changelog.changelog.hunks,
-      state: changelog.state,
-      labelOf: changelog.labelOf,
-      describe: changelog.describe,
-      onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
-      onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
-    };
-  }, [changelog]);
 
   /**
    * The logical changes with a hunk on screen, and where the reader sits among
@@ -220,6 +209,46 @@ export function App() {
     () => changesInOrder(notedOrder, notedHunks),
     [notedOrder, notedHunks],
   );
+
+  /**
+   * A, B, C… in the order the changes first appear on screen.
+   *
+   * Assigned here rather than in the hook, because a label is a position in
+   * the document: taking them from the changelog's table instead would open a
+   * diff whose first marker is B.
+   */
+  const labels = useMemo(
+    () =>
+      labelChanges(
+        changes,
+        changelog.changelog?.logicalChanges.map((change) => change.id) ?? [],
+      ),
+    [changes, changelog],
+  );
+
+  const labelOf = useCallback(
+    (id: string) => labels.get(id) ?? '?',
+    [labels],
+  );
+
+  /** The changelog as everything below reads it, labels included. */
+  const notes = useMemo(
+    () => ({ ...changelog, labelOf }),
+    [changelog, labelOf],
+  );
+
+  const documentNotes = useMemo(() => {
+    if (changelog.changelog === null) return null;
+
+    return {
+      hunks: changelog.changelog.hunks,
+      state: changelog.state,
+      labelOf,
+      describe: changelog.describe,
+      onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
+      onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
+    };
+  }, [changelog, labelOf]);
 
   const currentHunk = navigation.current?.hunkId ?? null;
 
@@ -339,7 +368,7 @@ export function App() {
 
       {changes.length > 0 && (
         <ChangeBar
-          label={currentChange === null ? null : changelog.labelOf(currentChange)}
+          label={currentChange === null ? null : labelOf(currentChange)}
           description={
             currentChange === null ? null : changelog.describe(currentChange)
           }
@@ -387,7 +416,7 @@ export function App() {
       {changelog.changelog !== null && (
         <NoteDialogs
           open={noteDialog}
-          notes={changelog}
+          notes={notes}
           order={notedOrder}
           onClose={() => setNoteDialog(null)}
           onGoToHunk={(_fileId, hunkId) => revealHunk(hunkId)}

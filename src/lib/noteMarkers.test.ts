@@ -5,6 +5,7 @@ import {
   changeOfHunk,
   changesInOrder,
   fileOfHunk,
+  labelChanges,
   focusFilter,
   hunksOfChange,
   laneColour,
@@ -299,5 +300,30 @@ describe('changeLabel', () => {
       `var(--note-lane-${26 % 6})`,
     );
     expect(laneColour(changeLabel(26))).not.toBe(laneColour(changeLabel(0)));
+  });
+});
+
+describe('labelChanges', () => {
+  const entry = (id: string, hunkId: string) => ({ id, hunkId });
+
+  // The labels are read down the gutter and along the bar, so they follow the
+  // document. Taking them from the changelog's table opened a diff on B.
+  it('labels in the order the reader meets them, not the table order', () => {
+    const labels = labelChanges(
+      [entry('2', 'a'), entry('0', 'b'), entry('1', 'c')],
+      ['0', '1', '2'],
+    );
+
+    expect(labels.get('2')).toBe('A');
+    expect(labels.get('0')).toBe('B');
+    expect(labels.get('1')).toBe('C');
+  });
+
+  it('still names a change the document never shows, after the rest', () => {
+    const labels = labelChanges([entry('1', 'a')], ['0', '1', '2']);
+
+    expect(labels.get('1')).toBe('A');
+    expect(labels.get('0')).toBe('B');
+    expect(labels.get('2')).toBe('C');
   });
 });
