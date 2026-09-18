@@ -19,7 +19,7 @@ import {
   positionOf,
   step,
 } from '../lib/navigation.ts';
-import type { Direction } from '../lib/navigation.ts';
+import type { Direction, NavigationFilter } from '../lib/navigation.ts';
 import type { ChangeLocation, DocumentFile, FileDiff } from '../types/index.ts';
 
 export interface DiffNavigation {
@@ -49,9 +49,14 @@ export interface DiffNavigation {
   revealRequest: number;
 }
 
+/**
+ * `filter` narrows the sequence — focusing a logical change steps through only
+ * the hunks it covers, and the readout counts only those.
+ */
 export function useDiffNavigation(
   files: DocumentFile[],
   ensureLoaded: (fileId: string) => Promise<FileDiff | null>,
+  filter?: NavigationFilter,
 ): DiffNavigation {
   const [current, setCurrent] = useState<ChangeLocation | null>(null);
   const [navigating, setNavigating] = useState(false);
@@ -64,7 +69,10 @@ export function useDiffNavigation(
    */
   const token = useRef(0);
 
-  const entries = useMemo(() => buildNavigationIndex(files), [files]);
+  const entries = useMemo(
+    () => buildNavigationIndex(files, filter),
+    [files, filter],
+  );
 
   const go = useCallback(
     (direction: Direction) => {

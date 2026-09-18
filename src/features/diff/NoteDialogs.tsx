@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownRight, X } from 'lucide-react';
+import { CornerDownRight, Crosshair, X } from 'lucide-react';
 import type { AiChangelogView } from '../../hooks/useAiChangelog.ts';
 import { fileOfHunk, hunksOfChange } from '../../lib/noteMarkers.ts';
 import styles from './NoteDialogs.module.css';
@@ -27,6 +27,10 @@ interface Props {
   /** Reveal a hunk in the document, and close. */
   onGoToHunk: (fileId: string, hunkId: string) => void;
   onOpenChange: (changeId: string) => void;
+  /** The change Previous/Next is currently narrowed to, if any. */
+  focused?: string | null;
+  onFocus?: (changeId: string) => void;
+  onClearFocus?: () => void;
 }
 
 export function NoteDialogs({
@@ -36,6 +40,9 @@ export function NoteDialogs({
   onClose,
   onGoToHunk,
   onOpenChange,
+  focused = null,
+  onFocus,
+  onClearFocus,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -79,6 +86,9 @@ export function NoteDialogs({
           order={order}
           onClose={onClose}
           onGoTo={goTo}
+          focused={focused === open.changeId}
+          onFocus={onFocus === undefined ? undefined : () => onFocus(open.changeId)}
+          onClearFocus={onClearFocus}
         />
       )}
     </dialog>
@@ -232,12 +242,18 @@ function ChangeDialog({
   order,
   onClose,
   onGoTo,
+  focused,
+  onFocus,
+  onClearFocus,
 }: {
   changeId: string;
   notes: AiChangelogView;
   order: readonly string[];
   onClose: () => void;
   onGoTo: (hunkId: string) => void;
+  focused: boolean;
+  onFocus?: () => void;
+  onClearFocus?: () => void;
 }) {
   const change = notes.logicalChange(changeId);
   const hunks = hunksOfChange(order, notes.changelog?.hunks ?? {}, changeId);
@@ -275,6 +291,24 @@ function ChangeDialog({
               ),
             )}
           </p>
+        )}
+
+        {(onFocus !== undefined || focused) && (
+          <section className={styles.focus}>
+            <button
+              type="button"
+              className={styles.focusButton}
+              onClick={focused ? onClearFocus : onFocus}
+            >
+              <Crosshair size={13} aria-hidden="true" />
+              {focused ? 'Stop focusing this change' : 'Focus this change'}
+            </button>
+            <p className={styles.muted}>
+              {focused
+                ? 'Previous and Next are stepping through this change only.'
+                : 'Previous and Next will step through this change only. Every hunk stays on screen.'}
+            </p>
+          </section>
         )}
 
         <section>

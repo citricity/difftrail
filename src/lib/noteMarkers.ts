@@ -8,6 +8,7 @@
  * hunks here, so its markers appear when it does.
  */
 
+import type { NavigationFilter } from './navigation.ts';
 import type { ResolvedHunk } from '../types/index.ts';
 
 export interface HunkMarkers {
@@ -90,4 +91,29 @@ export function hunksOfChange(
 export function fileOfHunk(hunkId: string): string {
   const marker = hunkId.lastIndexOf(':hunk:');
   return marker === -1 ? hunkId : hunkId.slice(0, marker);
+}
+
+/**
+ * Narrows Previous/Next to one logical change.
+ *
+ * Built from the changelog rather than from the document, so a file whose diff
+ * has not loaded yet is still a stop when the change reaches into it — the
+ * hunk ids say which file each one belongs to before the file itself arrives.
+ */
+export function focusFilter(
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+  change: string,
+): NavigationFilter {
+  const focused = new Set(
+    Object.entries(hunks)
+      .filter(([, hunk]) => hunk.logicalChangeIds.includes(change))
+      .map(([hunkId]) => hunkId),
+  );
+
+  const files = new Set([...focused].map(fileOfHunk));
+
+  return {
+    hunk: (hunkId) => focused.has(hunkId),
+    file: (fileId) => files.has(fileId),
+  };
 }

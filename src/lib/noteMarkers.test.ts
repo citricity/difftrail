@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildNoteMarkers, fileOfHunk, hunksOfChange } from './noteMarkers.ts';
+import {
+  buildNoteMarkers,
+  fileOfHunk,
+  focusFilter,
+  hunksOfChange,
+} from './noteMarkers.ts';
 import type { ResolvedHunk } from '../types/index.ts';
 
 function hunk(logicalChangeIds: string[]): ResolvedHunk {
@@ -103,5 +108,36 @@ describe('fileOfHunk', () => {
 
   it('leaves something that is not a hunk id alone', () => {
     expect(fileOfHunk('src/lib/rows.ts')).toBe('src/lib/rows.ts');
+  });
+});
+
+describe('focusFilter', () => {
+  const hunks = {
+    'src/one.ts:hunk:0': hunk(['0']),
+    'src/one.ts:hunk:1': hunk(['1']),
+    'src/two.ts:hunk:0': hunk(['0']),
+  };
+
+  it('keeps the hunks one change covers, and nothing else', () => {
+    const filter = focusFilter(hunks, '0');
+
+    expect(filter.hunk('src/one.ts:hunk:0')).toBe(true);
+    expect(filter.hunk('src/two.ts:hunk:0')).toBe(true);
+    expect(filter.hunk('src/one.ts:hunk:1')).toBe(false);
+  });
+
+  it('keeps a file the change reaches into, so an unloaded one is still a stop', () => {
+    const filter = focusFilter(hunks, '0');
+
+    expect(filter.file('src/one.ts')).toBe(true);
+    expect(filter.file('src/two.ts')).toBe(true);
+    expect(filter.file('src/three.ts')).toBe(false);
+  });
+
+  it('keeps nothing for a change nothing belongs to', () => {
+    const filter = focusFilter(hunks, 'missing');
+
+    expect(filter.hunk('src/one.ts:hunk:0')).toBe(false);
+    expect(filter.file('src/one.ts')).toBe(false);
   });
 });

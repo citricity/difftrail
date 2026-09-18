@@ -25,12 +25,28 @@ export type NavigationEntry =
 export type Direction = 'next' | 'previous';
 
 /**
+ * Which changes are in the sequence, when the reader has narrowed it.
+ *
+ * Focusing a logical change filters Previous/Next to the hunks it covers. A
+ * file whose diff has not been read yet cannot be asked which hunks it has, so
+ * `file` is asked about it instead — the changelog knows the paths its hunks
+ * belong to even before they load.
+ */
+export interface NavigationFilter {
+  hunk: (hunkId: string) => boolean;
+  file: (fileId: string) => boolean;
+}
+
+/**
  * Flattens files and hunks into the order Next Change walks.
  *
  * Files keep the order Git reported them in; hunks keep the order they appear
  * in the file.
  */
-export function buildNavigationIndex(files: DocumentFile[]): NavigationEntry[] {
+export function buildNavigationIndex(
+  files: DocumentFile[],
+  filter?: NavigationFilter,
+): NavigationEntry[] {
   const entries: NavigationEntry[] = [];
 
   for (const file of files) {
@@ -38,10 +54,15 @@ export function buildNavigationIndex(files: DocumentFile[]): NavigationEntry[] {
 
     if (file.status === 'loaded' && hunks.length > 0) {
       for (const hunk of hunks) {
+        if (filter && !filter.hunk(hunk.id)) continue;
         entries.push({ kind: 'hunk', fileId: file.meta.id, hunkId: hunk.id });
       }
       continue;
     }
+
+    // A file with nothing to step through is still a stop — unless the reader
+    // has narrowed the sequence and this file has no part in it.
+    if (filter && !filter.file(file.meta.id)) continue;
 
     // Not loaded yet, or loaded with nothing to step through. Either way the
     // file is one stop on the journey.

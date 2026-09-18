@@ -33,6 +33,7 @@ import {
 import type { RowMetrics, RowModel } from '../../lib/rows.ts';
 import { runsForContextLine, runsForLine } from '../../lib/rowRuns.ts';
 import { buildNavigationIndex, sameLocation } from '../../lib/navigation.ts';
+import type { NavigationFilter } from '../../lib/navigation.ts';
 import {
   buildScrollStops,
   changeInView,
@@ -114,6 +115,11 @@ interface Props {
    * exactly as wide as it always was.
    */
   notes?: DocumentNotes | null;
+  /**
+   * Narrows what scrolling can land on, so that following the scroll agrees
+   * with Previous/Next while a logical change is focused.
+   */
+  navigationFilter?: NavigationFilter;
 }
 
 export function DiffDocument({
@@ -135,6 +141,7 @@ export function DiffDocument({
   viewMode,
   onViewportWidthChange,
   notes = null,
+  navigationFilter,
 }: Props) {
   /**
    * The scrolling element, held twice on purpose.
@@ -263,8 +270,8 @@ export function DiffDocument({
   const followed = useRef<ChangeLocation | null>(null);
 
   const stops = useMemo(
-    () => buildScrollStops(model, buildNavigationIndex(files)),
-    [model, files],
+    () => buildScrollStops(model, buildNavigationIndex(files, navigationFilter)),
+    [model, files, navigationFilter],
   );
 
   /**

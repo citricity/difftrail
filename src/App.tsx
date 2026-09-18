@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StartupError } from './components/StartupError.tsx';
 import { DiffDocument } from './features/diff/DiffDocument.tsx';
 import { NoteDialogs } from './features/diff/NoteDialogs.tsx';
+import { NoteStatus } from './features/diff/NoteStatus.tsx';
 import type { NoteDialog } from './features/diff/NoteDialogs.tsx';
 import { NavigationControls } from './features/navigation/NavigationControls.tsx';
 import { ViewModeToggle } from './features/navigation/ViewModeToggle.tsx';
@@ -24,7 +25,7 @@ import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
 import { useRowMetrics } from './hooks/useRowMetrics.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import { autoWrapColumn, buildRowModel } from './lib/rows.ts';
-import { fileOfHunk } from './lib/noteMarkers.ts';
+import { fileOfHunk, focusFilter } from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
 import type { ViewMode } from './types/index.ts';
 import styles from './App.module.css';
@@ -134,7 +135,31 @@ export function App() {
     [state.files, metrics, wrapColumn, viewMode],
   );
 
-  const navigation = useDiffNavigation(state.files, ensureLoaded);
+  /**
+   * The logical change the reader has narrowed to, if any.
+   *
+   * Focus changes the sequence, not the document: every hunk stays on screen,
+   * and only Previous/Next, the readout and following the scroll are narrowed.
+   */
+  const [requestedFocus, setFocused] = useState<string | null>(null);
+
+  /**
+   * Derived rather than stored, so a changelog that no longer mentions the
+   * focused change lets the focus lapse by itself — correcting it in an effect
+   * would mean a render with the reader stepping through an empty sequence.
+   */
+  const focused =
+    requestedFocus !== null && changelog.logicalChange(requestedFocus) !== null
+      ? requestedFocus
+      : null;
+
+  const navigationFilter = useMemo(() => {
+    const hunks = changelog.changelog?.hunks;
+    if (focused === null || hunks === undefined) return undefined;
+    return focusFilter(hunks, focused);
+  }, [focused, changelog]);
+
+  const navigation = useDiffNavigation(state.files, ensureLoaded, navigationFilter);
 
   /** Which note dialog is open, if any. */
   const [noteDialog, setNoteDialog] = useState<NoteDialog>(null);
@@ -162,6 +187,7 @@ export function App() {
   useKeyboardShortcuts({
     onNext: navigation.goNext,
     onPrevious: navigation.goPrevious,
+    onEscape: focused === null ? undefined : () => setFocused(null),
   });
 
   const handleLoadFully = useCallback(
@@ -194,6 +220,20 @@ export function App() {
       <header className={styles.toolbar}>
         <RepositoryHeader repository={state.repository} summary={summary} />
         <NavigationControls navigation={navigation} />
+        {changelog.changelog !== null && (
+          <NoteStatus
+            summary={changelog.changelog.summary}
+            focus={
+              focused === null
+                ? null
+                : {
+                    label: changelog.labelOf(focused),
+                    description: changelog.describe(focused),
+                  }
+            }
+            onClearFocus={() => setFocused(null)}
+          />
+        )}
         <ViewModeToggle value={viewMode} onChange={chooseViewMode} />
         <SettingsDialog state={settingsState} />
         <GitAliasDialog />
@@ -222,6 +262,7 @@ export function App() {
         viewMode={viewMode}
         onViewportWidthChange={reportViewportWidth}
         notes={documentNotes}
+        navigationFilter={navigationFilter}
       />
 
       {changelog.changelog !== null && (
@@ -238,6 +279,15 @@ export function App() {
             if (first !== undefined) {
               navigation.goTo({ fileId: fileOfHunk(first), hunkId: first });
             }
+            setNoteDialog(null);
+          }}
+          focused={focused}
+          onFocus={(changeId) => {
+            setFocused(changeId);
+            setNoteDialog(null);
+          }}
+          onClearFocus={() => {
+            setFocused(null);
             setNoteDialog(null);
           }}
         />

@@ -205,3 +205,34 @@
 .issue:hover {
   text-decoration: underline;
 }
+
+/* Narrowing Previous/Next to one intent. Set apart from the hunk list below
+   it, because it changes how the toolbar behaves rather than jumping
+   somewhere. */
+.focus {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.focusButton {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: default;
+}
+
+.focusButton:hover {
+  text-decoration: underline;
+}
