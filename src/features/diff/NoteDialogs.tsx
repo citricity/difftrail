@@ -7,10 +7,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownRight, Crosshair, X } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { ChevronDown, ChevronUp, CornerDownRight, Crosshair, X } from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { AiChangelogView } from '../../hooks/useAiChangelog.ts';
 import { issueUrl } from '../../lib/issues.ts';
+import type { ChangeStop } from '../../lib/noteMarkers.ts';
 import {
   changesInOrder,
   fileOfHunk,
@@ -23,7 +24,7 @@ import styles from './NoteDialogs.module.css';
 /** What the reader has open, if anything. */
 export type NoteDialog =
   | { kind: 'hunk'; hunkId: string }
-  | { kind: 'change'; changeId: string }
+  | { kind: 'change'; changeId: string; stop?: number }
   | { kind: 'contents' }
   | null;
 
@@ -42,6 +43,11 @@ interface Props {
   onClearFocus?: () => void;
   /** The change the reader is in, marked in the contents list. */
   currentChange?: string | null;
+  /** How far the open change reaches, and where the reader is within it. */
+  stops?: readonly ChangeStop[];
+  stopIndex?: number;
+  /** Walk the open change, one stop at a time. */
+  onStep?: (delta: 1 | -1) => void;
 }
 
 export function NoteDialogs({
@@ -55,6 +61,9 @@ export function NoteDialogs({
   onFocus,
   onClearFocus,
   currentChange = null,
+  stops = [],
+  stopIndex = 0,
+  onStep,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -122,6 +131,9 @@ export function NoteDialogs({
           focused={focused === open.changeId}
           onFocus={onFocus === undefined ? undefined : () => onFocus(open.changeId)}
           onClearFocus={onClearFocus}
+          stops={stops}
+          stopIndex={stopIndex}
+          onStep={onStep}
         />
       )}
     </dialog>
@@ -131,12 +143,21 @@ export function NoteDialogs({
 /** One dialog is open at a time, so one id is enough to name it. */
 const TITLE_ID = 'note-dialog-title';
 
-function Header({ title, onClose }: { title: string; onClose: () => void }) {
+function Header({
+  title,
+  nav,
+  onClose,
+}: {
+  title: string;
+  nav?: ReactNode;
+  onClose: () => void;
+}) {
   return (
     <header className={styles.header}>
       <h2 id={TITLE_ID} className={styles.title}>
         {title}
       </h2>
+      {nav}
       <button
         type="button"
         className={styles.close}
@@ -374,6 +395,9 @@ function ChangeDialog({
   focused,
   onFocus,
   onClearFocus,
+  stops,
+  stopIndex,
+  onStep,
 }: {
   changeId: string;
   notes: AiChangelogView;
@@ -383,6 +407,9 @@ function ChangeDialog({
   focused: boolean;
   onFocus?: () => void;
   onClearFocus?: () => void;
+  stops: readonly ChangeStop[];
+  stopIndex: number;
+  onStep?: (delta: 1 | -1) => void;
 }) {
   const change = notes.logicalChange(changeId);
   const hunks = hunksOfChange(order, notes.changelog?.hunks ?? {}, changeId);
@@ -395,6 +422,35 @@ function ChangeDialog({
     <>
       <Header
         title={`Logical change ${notes.labelOf(changeId)}`}
+        nav={
+          onStep === undefined || stops.length < 2 ? undefined : (
+            // The change's own stops, walked in order: the far end of the block
+            // the reader is in, then the start of the next one, and so on. The
+            // dialog stays open, so a reader can keep going.
+            <span className={styles.walk}>
+              <button
+                type="button"
+                className={styles.walkButton}
+                onClick={() => onStep(-1)}
+                disabled={stopIndex <= 0}
+                title="Back through this change"
+                aria-label="Back through this change"
+              >
+                <ChevronUp size={15} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={styles.walkButton}
+                onClick={() => onStep(1)}
+                disabled={stopIndex >= stops.length - 1}
+                title="On through this change"
+                aria-label="On through this change"
+              >
+                <ChevronDown size={15} aria-hidden="true" />
+              </button>
+            </span>
+          )
+        }
         onClose={onClose}
       />
 

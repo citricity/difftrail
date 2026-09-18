@@ -7,8 +7,8 @@ import {
   fileOfHunk,
   labelChanges,
   focusFilter,
+  changeStops,
   hunksOfChange,
-  jumpTarget,
   laneColour,
   stepChange,
   ungroupedHunks,
@@ -25,16 +25,12 @@ function hunk(logicalChangeIds: string[]): ResolvedHunk {
   };
 }
 
-function markersFor(
-  order: string[],
-  membership: Record<string, string[]>,
-  fullOrder?: string[],
-) {
+function markersFor(order: string[], membership: Record<string, string[]>) {
   const hunks = Object.fromEntries(
     Object.entries(membership).map(([id, changes]) => [id, hunk(changes)]),
   );
 
-  return Object.fromEntries(buildNoteMarkers(order, hunks, fullOrder));
+  return Object.fromEntries(buildNoteMarkers(order, hunks));
 }
 
 describe('buildNoteMarkers', () => {
@@ -330,70 +326,27 @@ describe('labelChanges', () => {
   });
 });
 
-describe('a change that opens more than once', () => {
-  const membership = { a: ['0'], b: [], c: ['0'] };
-  const order = ['a', 'b', 'c'];
-
-  it('says the change carries on past the run that ends here', () => {
-    const markers = markersFor(order, membership);
-
-    expect(markers.a.continuesBelow).toEqual(['0']);
-    expect(markers.a.continuesAbove).toEqual([]);
-    expect(markers.c.continuesAbove).toEqual(['0']);
-    expect(markers.c.continuesBelow).toEqual([]);
-  });
-
-  it('counts hunks in files the document has not loaded', () => {
-    const markers = markersFor(['a'], { a: ['0'], z: ['0'] }, ['a', 'z']);
-
-    expect(markers.a.continuesBelow).toEqual(['0']);
-  });
-});
-
-describe('jumpTarget', () => {
-  const hunks = {
+describe('changeStops', () => {
+  const walked = {
     a: hunk(['0']),
     b: hunk([]),
     c: hunk(['0']),
     d: hunk(['0']),
-    e: hunk([]),
-    f: hunk(['0']),
   };
-  const order = ['a', 'b', 'c', 'd', 'e', 'f'];
-  const to = (from: string, kind: Parameters<typeof jumpTarget>[4]) =>
-    jumpTarget(order, hunks, '0', from, kind);
+  const walkedOrder = ['a', 'b', 'c', 'd'];
 
-  it('leaves for the run before or after, landing where it begins', () => {
-    expect(to('a', 'nextRun')).toBe('c');
-    expect(to('d', 'nextRun')).toBe('f');
-    expect(to('f', 'previousRun')).toBe('c');
-    expect(to('c', 'previousRun')).toBe('a');
+  // Two stops per run: a block has a top and a bottom, and one hunk can be
+  // forty lines, so a run of one still has two places to stand.
+  it('gives each run a start and an end, in document order', () => {
+    expect(changeStops(walkedOrder, walked, '0')).toEqual([
+      { hunkId: 'a', edge: 'start' },
+      { hunkId: 'a', edge: 'end' },
+      { hunkId: 'c', edge: 'start' },
+      { hunkId: 'd', edge: 'end' },
+    ]);
   });
 
-  it('treats a run as one, wherever in it the reader clicked', () => {
-    expect(to('d', 'nextRun')).toBe('f');
-    expect(to('d', 'previousRun')).toBe('a');
-  });
-
-  it('travels between the two ends of the run it is in', () => {
-    expect(to('c', 'runEnd')).toBe('d');
-    expect(to('d', 'runStart')).toBe('c');
-  });
-
-  // A block has a top and a bottom however few hunks it is made of - one long
-  // hunk is still tens of lines - so the far end is the same hunk, and which
-  // edge of it to show is the reveal's business rather than this one's.
-  it('answers with the same hunk on a run of one', () => {
-    expect(to('a', 'runEnd')).toBe('a');
-    expect(to('a', 'runStart')).toBe('a');
-  });
-
-  it('has nowhere to go at either end of the document', () => {
-    expect(to('a', 'previousRun')).toBeNull();
-    expect(to('f', 'nextRun')).toBeNull();
-  });
-
-  it('has nowhere to go for a hunk the change does not cover', () => {
-    expect(to('b', 'nextRun')).toBeNull();
+  it('has nothing to walk for a change nothing belongs to', () => {
+    expect(changeStops(walkedOrder, walked, 'missing')).toEqual([]);
   });
 });

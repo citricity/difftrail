@@ -18,19 +18,9 @@ export interface HunkMarkers {
   ends: string[];
   /** Covered, but neither the first hunk of the run nor the last. */
   inside: string[];
-  /** Changes marked here that also cover a hunk further up the document. */
-  continuesAbove: string[];
-  /** Changes marked here that also cover a hunk further down. */
-  continuesBelow: string[];
 }
 
-const NONE: HunkMarkers = {
-  starts: [],
-  ends: [],
-  inside: [],
-  continuesAbove: [],
-  continuesBelow: [],
-};
+const NONE: HunkMarkers = { starts: [], ends: [], inside: [] };
 
 export function noMarkers(): HunkMarkers {
   return NONE;
@@ -40,14 +30,11 @@ export function noMarkers(): HunkMarkers {
  * Marks the ends of each logical change's runs, in document order.
  *
  * `order` is every hunk the document currently holds, in the order it shows
- * them; `hunks` is the resolved notes, keyed by hunk id. `fullOrder` is every
- * hunk the changelog knows, loaded or not, which is what says whether a change
- * carries on beyond the run that ends here.
+ * them; `hunks` is the resolved notes, keyed by hunk id.
  */
 export function buildNoteMarkers(
   order: readonly string[],
   hunks: Readonly<Record<string, ResolvedHunk>>,
-  fullOrder: readonly string[] = order,
 ): Map<string, HunkMarkers> {
   const markers = new Map<string, HunkMarkers>();
 
@@ -57,21 +44,6 @@ export function buildNoteMarkers(
     return hunks[id]?.logicalChangeIds.includes(change) ?? false;
   };
 
-  // Where each change reaches in the whole diff, not only in what has been
-  // rendered: a run that ends because the next file has not loaded yet is
-  // still a change that carries on below, and a marker that said otherwise
-  // would be telling the reader there is nothing further to see.
-  const rank = new Map(fullOrder.map((id, index) => [id, index]));
-  const reach = new Map<string, number[]>();
-
-  fullOrder.forEach((id, index) => {
-    for (const change of hunks[id]?.logicalChangeIds ?? []) {
-      const seen = reach.get(change);
-      if (seen === undefined) reach.set(change, [index]);
-      else seen.push(index);
-    }
-  });
-
   order.forEach((id, index) => {
     const changes = hunks[id]?.logicalChangeIds ?? [];
     if (changes.length === 0) return;
@@ -79,10 +51,6 @@ export function buildNoteMarkers(
     const starts: string[] = [];
     const ends: string[] = [];
     const inside: string[] = [];
-    const continuesAbove: string[] = [];
-    const continuesBelow: string[] = [];
-
-    const here = rank.get(id);
 
     for (const change of changes) {
       const first = !covers(index - 1, change);
@@ -91,35 +59,20 @@ export function buildNoteMarkers(
       if (first) starts.push(change);
       if (last) ends.push(change);
       if (!first && !last) inside.push(change);
-
-      if (here === undefined) continue;
-      const elsewhere = reach.get(change) ?? [];
-      // A run that ends here only because the next file has not loaded is
-      // still a change with more to show, so this is asked of the whole diff
-      // rather than of the rows on screen.
-      if (first && elsewhere.some((position) => position < here)) {
-        continuesAbove.push(change);
-      }
-      if (last && elsewhere.some((position) => position > here)) {
-        continuesBelow.push(change);
-      }
     }
 
-    markers.set(id, { starts, ends, inside, continuesAbove, continuesBelow });
+    markers.set(id, { starts, ends, inside });
   });
 
   return markers;
 }
 
-/**
- * What a marker's arrows can take the reader to.
- *
- * From the start of a run, up leaves for the run before it and down goes to
- * the far end of this one; from the end of a run, up goes back to where it
- * began and down leaves for the run after. So each arrow means "the next thing
- * worth stopping at, that way, for this change".
- */
-export type RunJump = 'previousRun' | 'runStart' | 'runEnd' | 'nextRun';
+/** One place a change can take the reader: an end of one of its runs. */
+export interface ChangeStop {
+  hunkId: string;
+  /** Which end of that hunk to bring into view. */
+  edge: 'start' | 'end';
+}
 
 /** Every run of one change, in document order. */
 function runsOf(
@@ -147,37 +100,22 @@ function runsOf(
 }
 
 /**
- * Where one of a marker's arrows leads, or null when it leads nowhere.
+ * Where a change can be walked to, top to bottom.
  *
- * A jump to another run lands on that run's first hunk, which is where a
- * reader would start reading it. A jump within a run lands on the hunk at its
- * far end — the same hunk, when the run is one hunk long, because a block has
- * a top and a bottom however few hunks it is made of, and it is the caller's
- * reveal that decides which edge of that hunk to show.
+ * Two stops per run — where it begins and where it ends — so stepping down
+ * takes the reader to the end of the block they are in, then to the start of
+ * the next one. A run of a single hunk still has two: one hunk can be forty
+ * lines, and its two ends are two places on the screen.
  */
-export function jumpTarget(
+export function changeStops(
   order: readonly string[],
   hunks: Readonly<Record<string, ResolvedHunk>>,
   change: string,
-  fromHunkId: string,
-  kind: RunJump,
-): string | null {
-  const runs = runsOf(order, hunks, change);
-  const at = runs.findIndex((run) => run.includes(fromHunkId));
-  if (at === -1) return null;
-
-  const run = runs[at] ?? [];
-
-  switch (kind) {
-    case 'previousRun':
-      return runs[at - 1]?.[0] ?? null;
-    case 'nextRun':
-      return runs[at + 1]?.[0] ?? null;
-    case 'runStart':
-      return run[0] ?? null;
-    case 'runEnd':
-      return run[run.length - 1] ?? null;
-  }
+): ChangeStop[] {
+  return runsOf(order, hunks, change).flatMap((run) => [
+    { hunkId: run[0] ?? '', edge: 'start' as const },
+    { hunkId: run[run.length - 1] ?? '', edge: 'end' as const },
+  ]);
 }
 
 /**

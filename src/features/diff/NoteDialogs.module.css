@@ -43,6 +43,43 @@
   text-align: left;
 }
 
+/* Walking the change, in the dialog's own header: a pair of steppers between
+   the title and the close, sized like the toolbar's rather than like a gutter
+   mark, because here there is room to hit them. */
+.walk {
+  display: flex;
+  flex: 0 0 auto;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.walkButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  cursor: default;
+}
+
+.walkButton + .walkButton {
+  border-left: 1px solid var(--border);
+}
+
+.walkButton:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.walkButton:disabled {
+  color: var(--text-faint);
+}
+
 .close {
   display: flex;
   flex: 0 0 auto;

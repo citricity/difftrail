@@ -638,46 +638,11 @@
   color: var(--note-lane);
 }
 
-/* The same hover on all three marks: the change's own colour, lightened. An
-   outline or a grey wash would say "some control", where this says "this
-   change" — which is what the reader is tracking down the gutter. */
-.badge:hover,
-.jump:hover {
+/* The change's own colour, lightened. An outline or a grey wash would say
+   "some control", where this says "this change" — which is what the reader is
+   tracking down the gutter. */
+.badge:hover {
   filter: brightness(1.25);
-}
-
-/* A badge and, beside it, the arrows that travel its change. Kept together so
-   the group reads as one mark rather than as three. */
-.badgeGroup {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-}
-
-/* Where this change goes next, in the direction each chevron points: within
-   the block from the marker at either of its ends, and beyond it wherever the
-   change opens again. Full-size buttons beside the letter rather than slivers
-   stacked against it - the gutter gives up the width, and in return every one
-   of the three is a target you can hit without aiming. */
-.jumps {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 2px;
-  align-items: center;
-}
-
-.jump {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  padding: 0;
-  border: 1px solid var(--note-lane);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--note-lane);
-  cursor: pointer;
 }
 
 /* More changes meet here than the column can show. */

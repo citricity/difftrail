@@ -32,12 +32,12 @@ import {
   changesInOrder,
   documentOrder,
   fileOfHunk,
+  changeStops,
   focusFilter,
-  jumpTarget,
   labelChanges,
   stepChange,
 } from './lib/noteMarkers.ts';
-import type { RunJump } from './lib/noteMarkers.ts';
+import type { ChangeStop } from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
 import type { Direction } from './lib/navigation.ts';
 import type { ResolvedHunk, ViewMode } from './types/index.ts';
@@ -256,29 +256,13 @@ export function App() {
 
     return {
       hunks: changelog.changelog.hunks,
-      order: notedOrder,
       state: changelog.state,
       labelOf,
       describe: changelog.describe,
       onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
       onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
-      onJumpRun: (changeId: string, hunkId: string, kind: RunJump) => {
-        const target = jumpTarget(
-          notedOrder,
-          notedHunks,
-          changeId,
-          hunkId,
-          kind,
-        );
-        if (target === null) return;
-
-        // Only the far end of the block wants the bottom of what it lands on;
-        // everything else is somewhere the reader is about to start reading.
-        revealHunk(target, kind === 'runEnd' ? 'end' : 'start');
-        setRequestedChange(changeId);
-      },
     };
-  }, [changelog, labelOf, notedHunks, notedOrder, revealHunk]);
+  }, [changelog, labelOf]);
 
   const currentHunk = navigation.current?.hunkId ?? null;
 
@@ -301,6 +285,46 @@ export function App() {
 
   const currentChange =
     focused ?? stepped ?? changeOfHunk(notedHunks, currentHunk);
+
+/**
+   * The open change's stops, and where the reader stands among them.
+   *
+   * Walking a change belongs to its dialog rather than to the gutter: there is
+   * room there to say what each direction means, and a marker is for finding
+   * your place rather than for driving from. The dialog carries the index, so
+   * it survives a jump and the reader can keep stepping.
+   */
+  const dialogStops = useMemo(
+    () =>
+      noteDialog?.kind === 'change'
+        ? changeStops(notedOrder, notedHunks, noteDialog.changeId)
+        : ([] as ChangeStop[]),
+    [noteDialog, notedOrder, notedHunks],
+  );
+
+  /** Where the dialog's walk starts: the stop on the hunk the reader is on. */
+  const stopIndex =
+    noteDialog?.kind === 'change' && noteDialog.stop !== undefined
+      ? noteDialog.stop
+      : Math.max(
+          0,
+          dialogStops.findIndex((stop) => stop.hunkId === currentHunk),
+        );
+
+  const stepStop = useCallback(
+    (delta: 1 | -1) => {
+      if (noteDialog?.kind !== 'change') return;
+
+      const next = stopIndex + delta;
+      const target = dialogStops[next];
+      if (target === undefined) return;
+
+      revealHunk(target.hunkId, target.edge);
+      setRequestedChange(noteDialog.changeId);
+      setNoteDialog({ kind: 'change', changeId: noteDialog.changeId, stop: next });
+    },
+    [dialogStops, noteDialog, revealHunk, stopIndex],
+  );
   const changePosition = changes.findIndex((entry) => entry.id === currentChange);
 
   const nextChange = stepChange(
@@ -455,6 +479,9 @@ export function App() {
           }}
           focused={focused}
           currentChange={currentChange}
+          stops={dialogStops}
+          stopIndex={stopIndex}
+          onStep={stepStop}
           onFocus={(changeId) => {
             setFocused(changeId);
             setNoteDialog(null);

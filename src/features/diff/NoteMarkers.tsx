@@ -12,15 +12,9 @@
 
 import { memo } from 'react';
 import type { CSSProperties } from 'react';
-import {
-  ChevronDown,
-  ChevronUp,
-  MessageSquareDashed,
-  MessageSquareText,
-} from 'lucide-react';
+import { MessageSquareDashed, MessageSquareText } from 'lucide-react';
 import type { HunkNoteState } from '../../hooks/useAiChangelog.ts';
 import { laneColour } from '../../lib/noteMarkers.ts';
-import type { RunJump } from '../../lib/noteMarkers.ts';
 import styles from './DiffRows.module.css';
 
 /** Past this, the rest become a `+n` rather than squeezing the column. */
@@ -31,15 +25,9 @@ interface BadgesProps {
   starts: readonly string[];
   /** Logical changes whose run ends at this row. */
   ends: readonly string[];
-  /** Of those, the ones that also cover hunks further up the document. */
-  continuesAbove?: readonly string[];
-  /** Of those, the ones that also cover hunks further down. */
-  continuesBelow?: readonly string[];
   labelOf: (change: string) => string;
   describe: (change: string) => string;
   onOpen: (change: string) => void;
-  /** Go to the change's next run, in the direction the chevron points. */
-  onJump?: (change: string, kind: RunJump) => void;
 }
 
 /**
@@ -49,22 +37,18 @@ interface BadgesProps {
  * is no line joining the two: the markers are enough, and a rule down the
  * gutter would compete with the code for attention.
  *
- * Beside the letter, the arrows that travel its change where there is
- * somewhere to go: they travel the change rather than the document, so from the start of a
- * run they lead to the run before it and to this run's far end, and from its
- * end back to where this run began and on to the next one. Without them a
- * hollow badge reads as the end of the change rather than the end of one of
- * its parts. The letter beside them still opens the change.
+ * Letters and nothing else. Walking a change — to the far end of the block, or
+ * on to the next one — belongs to its dialog, where there is room to say what
+ * each direction means; in the gutter it cost the width that two changes
+ * meeting on one row need, and a marker is for finding your place rather than
+ * for driving from.
  */
 function LogicalBadgesImpl({
   starts,
   ends,
-  continuesAbove = [],
-  continuesBelow = [],
   labelOf,
   describe,
   onOpen,
-  onJump,
 }: BadgesProps) {
   const badges = [
     ...starts.map((change) => ({ change, starting: true })),
@@ -82,79 +66,23 @@ function LogicalBadgesImpl({
       {shown.map(({ change, starting }) => {
         const label = labelOf(change);
 
-        // Each arrow is the next thing worth stopping at, that way, for this
-        // change: from a run's start, up leaves for the run before and down
-        // goes to the far end of this one; from its end, up goes back to where
-        // it began and down leaves for the run after.
-        // Within the block, the far end is always somewhere to go: a run has a
-        // top and a bottom whether it is one long hunk or six short ones.
-        // Beyond it, only where the change opens again.
-        const up: RunJump | null = starting
-          ? continuesAbove.includes(change)
-            ? 'previousRun'
-            : null
-          : 'runStart';
-
-        const down: RunJump | null = starting
-          ? 'runEnd'
-          : continuesBelow.includes(change)
-            ? 'nextRun'
-            : null;
-
-        const lane = { '--note-lane': laneColour(label) } as CSSProperties;
-
         return (
-          <span key={change} className={styles.badgeGroup}>
-            <button
-              type="button"
-              className={`${styles.badge} ${starting ? styles.starts : styles.ends}`}
-              style={lane}
-              title={`${label} — ${describe(change)}`}
-              aria-label={`Logical change ${label}: ${
-                starting ? 'starts here' : 'ends here'
-              }`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpen(change);
-              }}
-            >
-              {label}
-            </button>
-
-            {onJump !== undefined && (up !== null || down !== null) && (
-              <span className={styles.jumps} style={lane}>
-                {up !== null && (
-                  <button
-                    type="button"
-                    className={styles.jump}
-                    title={describeJump(label, up)}
-                    aria-label={describeJump(label, up)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onJump(change, up);
-                    }}
-                  >
-                    <ChevronUp size={11} aria-hidden="true" />
-                  </button>
-                )}
-
-                {down !== null && (
-                  <button
-                    type="button"
-                    className={styles.jump}
-                    title={describeJump(label, down)}
-                    aria-label={describeJump(label, down)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onJump(change, down);
-                    }}
-                  >
-                    <ChevronDown size={11} aria-hidden="true" />
-                  </button>
-                )}
-              </span>
-            )}
-          </span>
+          <button
+            key={change}
+            type="button"
+            className={`${styles.badge} ${starting ? styles.starts : styles.ends}`}
+            style={{ '--note-lane': laneColour(label) } as CSSProperties}
+            title={`${label} — ${describe(change)}`}
+            aria-label={`Logical change ${label}: ${
+              starting ? 'starts here' : 'ends here'
+            }`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen(change);
+            }}
+          >
+            {label}
+          </button>
         );
       })}
 
@@ -164,19 +92,6 @@ function LogicalBadgesImpl({
 }
 
 export const LogicalBadges = memo(LogicalBadgesImpl);
-
-function describeJump(label: string, kind: RunJump): string {
-  switch (kind) {
-    case 'previousRun':
-      return `Go to the previous part of logical change ${label}`;
-    case 'nextRun':
-      return `Go to the next part of logical change ${label}`;
-    case 'runStart':
-      return `Go to the start of this part of logical change ${label}`;
-    case 'runEnd':
-      return `Go to the end of this part of logical change ${label}`;
-  }
-}
 
 interface HunkNoteProps {
   state: HunkNoteState;
