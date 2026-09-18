@@ -333,7 +333,7 @@ const AI_CHANGELOG: AiChangelog = {
     {
       id: '1',
       description:
-        'Keep the reader where they were when the row model is rebuilt.',
+        'Retire the hand-measured scrolling, in the row model and in the module it left behind.',
       associatedIssues: [],
     },
   ],
@@ -363,6 +363,17 @@ const AI_CHANGELOG: AiChangelog = {
       ambiguous: false,
       partial: false,
     },
+    // Two files apart from its other hunk, so the sample shows a change that
+    // opens twice — and the chevron that says so on the marker between them.
+    'src/legacy/removed.ts:hunk:0': {
+      hunkId: 'src/legacy/removed.ts:hunk:0',
+      reasons: [
+        'Nothing measured the DOM any more, so the module had no callers left.',
+      ],
+      logicalChangeIds: ['1'],
+      ambiguous: false,
+      partial: false,
+    },
     'src/styles/tokens.css:hunk:0': {
       hunkId: 'src/styles/tokens.css:hunk:0',
       reasons: [],
@@ -372,8 +383,8 @@ const AI_CHANGELOG: AiChangelog = {
     },
   },
   summary: {
-    matched: 4,
-    total: 5,
+    matched: 5,
+    total: 6,
     unexplained: 1,
     partial: 1,
     staleNotes: 1,

@@ -643,6 +643,36 @@
   outline-offset: 1px;
 }
 
+/* A badge and, where the change opens again elsewhere, the chevron that goes
+   there. Kept together so the pair reads as one mark rather than as two. */
+.badgeGroup {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+/* The change picks up again further down, or resumes from above. Its own
+   control, because clicking it goes there — drawn in the change's colour so it
+   belongs to the badge beside it rather than to the gutter. */
+.carriesOn {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--note-lane);
+  cursor: pointer;
+}
+
+.carriesOn:hover {
+  background: var(--surface-hover);
+}
+
 /* More changes meet here than the column can show. */
 .more {
   flex: 0 0 auto;

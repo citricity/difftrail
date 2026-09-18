@@ -22,12 +22,24 @@ export type HunkNoteState =
  */
 export interface DocumentNotes {
   hunks: Record<string, ResolvedHunk>;
+  /**
+   * Every hunk the changelog knows, in document order — including those in
+   * files nobody has opened. It is what says whether a change carries on past
+   * the run ending on screen, which the rendered rows alone cannot answer.
+   */
+  order: readonly string[];
   state: (hunkId: string) => HunkNoteState;
   labelOf: (change: string) => string;
   /** One line for a marker's tooltip. */
   describe: (change: string) => string;
   onOpenHunk: (hunkId: string) => void;
   onOpenChange: (change: string) => void;
+  /** Go to the run of `change` above or below the one `hunkId` sits in. */
+  onJumpRun: (
+    change: string,
+    hunkId: string,
+    direction: 'above' | 'below',
+  ) => void;
 }
 
 export interface AiChangelogData {

@@ -12,7 +12,12 @@
 
 import { memo } from 'react';
 import type { CSSProperties } from 'react';
-import { MessageSquareDashed, MessageSquareText } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  MessageSquareDashed,
+  MessageSquareText,
+} from 'lucide-react';
 import type { HunkNoteState } from '../../hooks/useAiChangelog.ts';
 import { laneColour } from '../../lib/noteMarkers.ts';
 import styles from './DiffRows.module.css';
@@ -25,9 +30,15 @@ interface BadgesProps {
   starts: readonly string[];
   /** Logical changes whose run ends at this row. */
   ends: readonly string[];
+  /** Of those, the ones that also cover hunks further up the document. */
+  continuesAbove?: readonly string[];
+  /** Of those, the ones that also cover hunks further down. */
+  continuesBelow?: readonly string[];
   labelOf: (change: string) => string;
   describe: (change: string) => string;
   onOpen: (change: string) => void;
+  /** Go to the change's next run, in the direction the chevron points. */
+  onJump?: (change: string, direction: 'above' | 'below') => void;
 }
 
 /**
@@ -36,13 +47,23 @@ interface BadgesProps {
  * A change is **filled where its run starts and hollow where it ends**. There
  * is no line joining the two: the markers are enough, and a rule down the
  * gutter would compete with the code for attention.
+ *
+ * A change may open and close more than once, so a marker at the end of a run
+ * carries a chevron when the same change picks up again further down — without
+ * it, a hollow badge reads as the end of the change rather than the end of one
+ * of its runs. The chevron points the way the change continues, takes the
+ * change's own colour, and goes there when clicked; the letter beside it still
+ * opens the change.
  */
 function LogicalBadgesImpl({
   starts,
   ends,
+  continuesAbove = [],
+  continuesBelow = [],
   labelOf,
   describe,
   onOpen,
+  onJump,
 }: BadgesProps) {
   const badges = [
     ...starts.map((change) => ({ change, starting: true })),
@@ -57,24 +78,62 @@ function LogicalBadgesImpl({
 
   return (
     <>
-      {shown.map(({ change, starting }) => (
-        <button
-          key={change}
-          type="button"
-          className={`${styles.badge} ${starting ? styles.starts : styles.ends}`}
-          style={{ '--note-lane': laneColour(labelOf(change)) } as CSSProperties}
-          title={`${labelOf(change)} — ${describe(change)}`}
-          aria-label={`Logical change ${labelOf(change)}: ${
-            starting ? 'starts here' : 'ends here'
-          }`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(change);
-          }}
-        >
-          {labelOf(change)}
-        </button>
-      ))}
+      {shown.map(({ change, starting }) => {
+        // The chevron follows the marker it belongs to: a run's start offers
+        // the run before it, its end the run after. A single-hunk run draws
+        // both marks, on the hunk's first and last line, so it can carry one
+        // of each without either pointing the wrong way.
+        const carriesOn = starting
+          ? continuesAbove.includes(change)
+            ? 'above'
+            : null
+          : continuesBelow.includes(change)
+            ? 'below'
+            : null;
+
+        const label = labelOf(change);
+        const Chevron = carriesOn === 'below' ? ChevronDown : ChevronUp;
+        const jump =
+          carriesOn === 'below'
+            ? `Go to the next part of logical change ${label}`
+            : `Go to the previous part of logical change ${label}`;
+
+        return (
+          <span key={change} className={styles.badgeGroup}>
+            <button
+              type="button"
+              className={`${styles.badge} ${starting ? styles.starts : styles.ends}`}
+              style={{ '--note-lane': laneColour(label) } as CSSProperties}
+              title={`${label} — ${describe(change)}`}
+              aria-label={`Logical change ${label}: ${
+                starting ? 'starts here' : 'ends here'
+              }`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(change);
+              }}
+            >
+              {label}
+            </button>
+
+            {carriesOn !== null && onJump !== undefined && (
+              <button
+                type="button"
+                className={styles.carriesOn}
+                style={{ '--note-lane': laneColour(label) } as CSSProperties}
+                title={jump}
+                aria-label={jump}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onJump(change, carriesOn);
+                }}
+              >
+                <Chevron size={11} aria-hidden="true" />
+              </button>
+            )}
+          </span>
+        );
+      })}
 
       {rest > 0 && <span className={styles.more}>+{rest}</span>}
     </>

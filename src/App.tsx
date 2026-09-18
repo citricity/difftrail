@@ -27,6 +27,7 @@ import { useRowMetrics } from './hooks/useRowMetrics.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import { autoWrapColumn, buildRowModel } from './lib/rows.ts';
 import {
+  adjacentRun,
   changeOfHunk,
   changesInOrder,
   documentOrder,
@@ -178,6 +179,17 @@ export function App() {
   /** Which note dialog is open, if any. */
   const [noteDialog, setNoteDialog] = useState<NoteDialog>(null);
 
+  /**
+   * Reveals a hunk that may be in a file nobody has opened yet — the file
+   * lands at once and the hunk follows when its diff arrives.
+   */
+  const revealHunk = useCallback(
+    (hunkId: string) => {
+      navigation.goToHunk(fileOfHunk(hunkId), hunkId);
+    },
+    [navigation],
+  );
+
 
   /**
    * The logical changes with a hunk on screen, and where the reader sits among
@@ -242,13 +254,31 @@ export function App() {
 
     return {
       hunks: changelog.changelog.hunks,
+      order: notedOrder,
       state: changelog.state,
       labelOf,
       describe: changelog.describe,
       onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
       onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
+      onJumpRun: (
+        changeId: string,
+        hunkId: string,
+        direction: 'above' | 'below',
+      ) => {
+        const target = adjacentRun(
+          notedOrder,
+          notedHunks,
+          changeId,
+          hunkId,
+          direction,
+        );
+        if (target === null) return;
+
+        revealHunk(target);
+        setRequestedChange(changeId);
+      },
     };
-  }, [changelog, labelOf]);
+  }, [changelog, labelOf, notedHunks, notedOrder, revealHunk]);
 
   const currentHunk = navigation.current?.hunkId ?? null;
 
@@ -290,12 +320,6 @@ export function App() {
     'previous',
   );
 
-  const revealHunk = useCallback(
-    (hunkId: string) => {
-      navigation.goToHunk(fileOfHunk(hunkId), hunkId);
-    },
-    [navigation],
-  );
 
   /**
    * Stepping while focused moves the focus with it, so the arrows read as

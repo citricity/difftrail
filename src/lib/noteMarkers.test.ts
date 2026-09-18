@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjacentRun,
   buildNoteMarkers,
   changeLabel,
   changeOfHunk,
@@ -27,12 +28,13 @@ function hunk(logicalChangeIds: string[]): ResolvedHunk {
 function markersFor(
   order: string[],
   membership: Record<string, string[]>,
-): Record<string, { starts: string[]; ends: string[]; inside: string[] }> {
+  fullOrder?: string[],
+) {
   const hunks = Object.fromEntries(
     Object.entries(membership).map(([id, changes]) => [id, hunk(changes)]),
   );
 
-  return Object.fromEntries(buildNoteMarkers(order, hunks));
+  return Object.fromEntries(buildNoteMarkers(order, hunks, fullOrder));
 }
 
 describe('buildNoteMarkers', () => {
@@ -43,23 +45,23 @@ describe('buildNoteMarkers', () => {
       c: ['0'],
     });
 
-    expect(markers.a).toEqual({ starts: ['0'], ends: [], inside: [] });
-    expect(markers.b).toEqual({ starts: [], ends: [], inside: ['0'] });
-    expect(markers.c).toEqual({ starts: [], ends: ['0'], inside: [] });
+    expect(markers.a).toMatchObject({ starts: ['0'], ends: [], inside: [] });
+    expect(markers.b).toMatchObject({ starts: [], ends: [], inside: ['0'] });
+    expect(markers.c).toMatchObject({ starts: [], ends: ['0'], inside: [] });
   });
 
   it('starts and ends a single-hunk change on the same hunk', () => {
     const markers = markersFor(['a'], { a: ['0'] });
-    expect(markers.a).toEqual({ starts: ['0'], ends: ['0'], inside: [] });
+    expect(markers.a).toMatchObject({ starts: ['0'], ends: ['0'], inside: [] });
   });
 
   it('gives a re-opened span a marker at each end of each run', () => {
     // "Hunks 1 and 3 but not 2" — which is the whole reason spans re-open.
     const markers = markersFor(['a', 'b', 'c'], { a: ['0'], c: ['0'] });
 
-    expect(markers.a).toEqual({ starts: ['0'], ends: ['0'], inside: [] });
+    expect(markers.a).toMatchObject({ starts: ['0'], ends: ['0'], inside: [] });
     expect(markers.b).toBeUndefined();
-    expect(markers.c).toEqual({ starts: ['0'], ends: ['0'], inside: [] });
+    expect(markers.c).toMatchObject({ starts: ['0'], ends: ['0'], inside: [] });
   });
 
   it('keeps overlapping changes apart', () => {
@@ -69,9 +71,9 @@ describe('buildNoteMarkers', () => {
       c: ['1'],
     });
 
-    expect(markers.a).toEqual({ starts: ['0'], ends: [], inside: [] });
-    expect(markers.b).toEqual({ starts: ['1'], ends: ['0'], inside: [] });
-    expect(markers.c).toEqual({ starts: [], ends: ['1'], inside: [] });
+    expect(markers.a).toMatchObject({ starts: ['0'], ends: [], inside: [] });
+    expect(markers.b).toMatchObject({ starts: ['1'], ends: ['0'], inside: [] });
+    expect(markers.c).toMatchObject({ starts: [], ends: ['1'], inside: [] });
   });
 
   it('has nothing to say about a hunk no change covers', () => {
@@ -325,5 +327,71 @@ describe('labelChanges', () => {
     expect(labels.get('1')).toBe('A');
     expect(labels.get('0')).toBe('B');
     expect(labels.get('2')).toBe('C');
+  });
+});
+
+describe('a change that opens more than once', () => {
+  const membership = { a: ['0'], b: [], c: ['0'] };
+  const order = ['a', 'b', 'c'];
+
+  it('says the change carries on past the run that ends here', () => {
+    const markers = markersFor(order, membership);
+
+    expect(markers.a.continuesBelow).toEqual(['0']);
+    expect(markers.a.continuesAbove).toEqual([]);
+    expect(markers.c.continuesAbove).toEqual(['0']);
+    expect(markers.c.continuesBelow).toEqual([]);
+  });
+
+  it('says nothing about a change with only one run', () => {
+    const markers = markersFor(['a', 'b'], { a: ['0'], b: ['0'] });
+
+    expect(markers.a.continuesBelow).toEqual([]);
+    expect(markers.b.continuesAbove).toEqual([]);
+  });
+
+  // The run ends on screen only because the next file has not been read yet.
+  // Judged by the rendered rows alone, the marker would tell the reader there
+  // is nothing further to see.
+  it('counts hunks in files the document has not loaded', () => {
+    const markers = markersFor(['a'], { a: ['0'], z: ['0'] }, ['a', 'z']);
+
+    expect(markers.a.continuesBelow).toEqual(['0']);
+  });
+});
+
+describe('adjacentRun', () => {
+  const hunks = {
+    a: hunk(['0']),
+    b: hunk([]),
+    c: hunk(['0']),
+    d: hunk(['0']),
+    e: hunk([]),
+    f: hunk(['0']),
+  };
+  const order = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+  it('lands on the first hunk of the next run, not the next hunk', () => {
+    expect(adjacentRun(order, hunks, '0', 'a', 'below')).toBe('c');
+    expect(adjacentRun(order, hunks, '0', 'd', 'below')).toBe('f');
+  });
+
+  it('goes back to the top of the previous run', () => {
+    expect(adjacentRun(order, hunks, '0', 'f', 'above')).toBe('c');
+    expect(adjacentRun(order, hunks, '0', 'c', 'above')).toBe('a');
+  });
+
+  it('treats a run as one, wherever in it the reader clicked', () => {
+    expect(adjacentRun(order, hunks, '0', 'c', 'below')).toBe('f');
+    expect(adjacentRun(order, hunks, '0', 'd', 'above')).toBe('a');
+  });
+
+  it('has nowhere to go at either end', () => {
+    expect(adjacentRun(order, hunks, '0', 'a', 'above')).toBeNull();
+    expect(adjacentRun(order, hunks, '0', 'f', 'below')).toBeNull();
+  });
+
+  it('has nowhere to go for a hunk the change does not cover', () => {
+    expect(adjacentRun(order, hunks, '0', 'b', 'below')).toBeNull();
   });
 });

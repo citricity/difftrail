@@ -18,9 +18,19 @@ export interface HunkMarkers {
   ends: string[];
   /** Covered, but neither the first hunk of the run nor the last. */
   inside: string[];
+  /** Changes marked here that also cover a hunk further up the document. */
+  continuesAbove: string[];
+  /** Changes marked here that also cover a hunk further down. */
+  continuesBelow: string[];
 }
 
-const NONE: HunkMarkers = { starts: [], ends: [], inside: [] };
+const NONE: HunkMarkers = {
+  starts: [],
+  ends: [],
+  inside: [],
+  continuesAbove: [],
+  continuesBelow: [],
+};
 
 export function noMarkers(): HunkMarkers {
   return NONE;
@@ -30,11 +40,14 @@ export function noMarkers(): HunkMarkers {
  * Marks the ends of each logical change's runs, in document order.
  *
  * `order` is every hunk the document currently holds, in the order it shows
- * them; `hunks` is the resolved notes, keyed by hunk id.
+ * them; `hunks` is the resolved notes, keyed by hunk id. `fullOrder` is every
+ * hunk the changelog knows, loaded or not, which is what says whether a change
+ * carries on beyond the run that ends here.
  */
 export function buildNoteMarkers(
   order: readonly string[],
   hunks: Readonly<Record<string, ResolvedHunk>>,
+  fullOrder: readonly string[] = order,
 ): Map<string, HunkMarkers> {
   const markers = new Map<string, HunkMarkers>();
 
@@ -44,6 +57,21 @@ export function buildNoteMarkers(
     return hunks[id]?.logicalChangeIds.includes(change) ?? false;
   };
 
+  // Where each change reaches in the whole diff, not only in what has been
+  // rendered: a run that ends because the next file has not loaded yet is
+  // still a change that carries on below, and a marker that said otherwise
+  // would be telling the reader there is nothing further to see.
+  const rank = new Map(fullOrder.map((id, index) => [id, index]));
+  const reach = new Map<string, number[]>();
+
+  fullOrder.forEach((id, index) => {
+    for (const change of hunks[id]?.logicalChangeIds ?? []) {
+      const seen = reach.get(change);
+      if (seen === undefined) reach.set(change, [index]);
+      else seen.push(index);
+    }
+  });
+
   order.forEach((id, index) => {
     const changes = hunks[id]?.logicalChangeIds ?? [];
     if (changes.length === 0) return;
@@ -51,6 +79,10 @@ export function buildNoteMarkers(
     const starts: string[] = [];
     const ends: string[] = [];
     const inside: string[] = [];
+    const continuesAbove: string[] = [];
+    const continuesBelow: string[] = [];
+
+    const here = rank.get(id);
 
     for (const change of changes) {
       const first = !covers(index - 1, change);
@@ -59,12 +91,59 @@ export function buildNoteMarkers(
       if (first) starts.push(change);
       if (last) ends.push(change);
       if (!first && !last) inside.push(change);
+
+      if (here === undefined) continue;
+      const elsewhere = reach.get(change) ?? [];
+      if (first && elsewhere.some((position) => position < here)) {
+        continuesAbove.push(change);
+      }
+      if (last && elsewhere.some((position) => position > here)) {
+        continuesBelow.push(change);
+      }
     }
 
-    markers.set(id, { starts, ends, inside });
+    markers.set(id, { starts, ends, inside, continuesAbove, continuesBelow });
   });
 
   return markers;
+}
+
+/**
+ * Where the change's next run starts, above or below the one this hunk is in.
+ *
+ * A change may open and close several times, and the marker at the end of a
+ * run offers to go to the next one — so this answers what that jump lands on.
+ * Both directions land on the first hunk of the run, which is where a reader
+ * would start reading it.
+ */
+export function adjacentRun(
+  order: readonly string[],
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+  change: string,
+  fromHunkId: string,
+  direction: 'above' | 'below',
+): string | null {
+  const runs: string[][] = [];
+  let run: string[] | null = null;
+
+  for (const hunkId of order) {
+    if (hunks[hunkId]?.logicalChangeIds.includes(change) === true) {
+      if (run === null) {
+        run = [hunkId];
+        runs.push(run);
+      } else {
+        run.push(hunkId);
+      }
+    } else {
+      run = null;
+    }
+  }
+
+  const at = runs.findIndex((covered) => covered.includes(fromHunkId));
+  if (at === -1) return null;
+
+  const target = runs[direction === 'below' ? at + 1 : at - 1];
+  return target?.[0] ?? null;
 }
 
 /**

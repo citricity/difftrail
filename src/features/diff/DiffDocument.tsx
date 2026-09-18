@@ -226,7 +226,7 @@ export function DiffDocument({
       .filter((row) => row.kind === 'hunk-header')
       .map((row) => row.hunkId);
 
-    return buildNoteMarkers(order, notes.hunks);
+    return buildNoteMarkers(order, notes.hunks, notes.order);
   }, [model, notes]);
 
   const badgesFor = (hunk: DiffHunk, lineIndex: number): ReactNode => {
@@ -241,9 +241,14 @@ export function DiffDocument({
       <LogicalBadges
         starts={starts}
         ends={ends}
+        continuesAbove={marks.continuesAbove}
+        continuesBelow={marks.continuesBelow}
         labelOf={notes.labelOf}
         describe={notes.describe}
         onOpen={notes.onOpenChange}
+        onJump={(change, direction) => {
+          notes.onJumpRun(change, hunk.id, direction);
+        }}
       />
     );
   };
