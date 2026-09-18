@@ -15,6 +15,14 @@ export type {
   RepositoryInfo,
 } from './diff.ts';
 
+export type {
+  AiChangelog,
+  LogicalChange,
+  MatchSummary,
+  ResolvedHunk,
+} from './aiChangelog.ts';
+export { changedSince, isComplete } from './aiChangelog.ts';
+
 export type { GitAliasStatus } from './gitAlias.ts';
 export type { LaunchOptions } from './launch.ts';
 
