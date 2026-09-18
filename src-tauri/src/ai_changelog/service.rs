@@ -32,19 +32,15 @@ pub enum IgnoreState {
 }
 
 impl IgnoreState {
-    /// What to tell whoever ran the command. Both cures are named because
-    /// `.gitignore` is a tracked file: editing it puts a change into the very
-    /// diff about to be reviewed, while `.git/info/exclude` is local and
-    /// invisible to every diff.
+    /// What to tell whoever ran the command when nothing can be done for them.
+    ///
+    /// Only the tracked case gets here: an unignored folder is fixed rather
+    /// than reported (see [`ensure_ignored`]), but an ignore rule cannot undo
+    /// tracking, and guessing that someone wants a file removed from their
+    /// index is not ours to make.
     pub fn message(self) -> Option<String> {
         match self {
-            Self::Ignored => None,
-            Self::NotIgnored => Some(format!(
-                "{dir}/ is not ignored by git.\n\
-                 Add it to .gitignore (shared with your team), or to\n\
-                 .git/info/exclude (this clone only, and won't appear in your diff).",
-                dir = capture::EXCLUDED_PATH
-            )),
+            Self::Ignored | Self::NotIgnored => None,
             Self::Tracked => Some(format!(
                 "{dir}/ is already tracked by git, so ignoring it has no effect.\n\
                  Remove it from the index first:  git rm -r --cached {dir}",
@@ -52,6 +48,103 @@ impl IgnoreState {
             )),
         }
     }
+}
+
+/// Makes sure `.difftrek/` is ignored, doing it if it is not.
+///
+/// The exclusion goes in `.git/info/exclude`, never `.gitignore`. `.gitignore`
+/// is a tracked file, so editing it would put a change into the very diff about
+/// to be reviewed — and it is shared with everyone else on the project, which
+/// is not a decision this command should take on their behalf.
+/// `.git/info/exclude` is local to the clone, invisible to every diff, and
+/// undone by deleting a line.
+///
+/// Refusing instead would be tidier in principle and worse in practice: the
+/// thing that runs this is usually an agent halfway through a task, which will
+/// either give up or start improvising with `.gitignore`.
+///
+/// Returns what to tell the user, or `None` when there was nothing to do.
+pub fn ensure_ignored(root: &Path) -> AppResult<Option<String>> {
+    match ignore_state(root) {
+        IgnoreState::Ignored => Ok(None),
+        IgnoreState::Tracked => Err(AppError::new(
+            ErrorKind::GitCommandFailed,
+            IgnoreState::Tracked.message().unwrap_or_default(),
+        )),
+        IgnoreState::NotIgnored => {
+            let exclude = exclude_file(root)?;
+            append_exclusion(&exclude).map_err(|err| {
+                AppError::new(
+                    ErrorKind::GitCommandFailed,
+                    format!(
+                        "{dir}/ is not ignored by git, and Diff Trek could not add it to \
+                         {path}.\nAdd {dir}/ to that file, or to .gitignore, and run this again.",
+                        dir = capture::EXCLUDED_PATH,
+                        path = exclude.display()
+                    ),
+                )
+                .with_detail(err.to_string())
+            })?;
+
+            Ok(Some(format!(
+                "Added {dir}/ to {path} — local to this clone, and invisible to every diff.",
+                dir = capture::EXCLUDED_PATH,
+                path = exclude.display()
+            )))
+        }
+    }
+}
+
+/// `.git/info/exclude` for this repository.
+///
+/// Asked of Git rather than assumed: `.git` is a file rather than a directory
+/// in a worktree or a submodule, and a linked worktree keeps `info/exclude` in
+/// the common directory it shares with the main one.
+fn exclude_file(root: &Path) -> AppResult<PathBuf> {
+    let common = status_of(root, &["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|path| !path.is_empty())
+        .ok_or_else(|| {
+            AppError::new(
+                ErrorKind::GitCommandFailed,
+                "Diff Trek could not find this repository's Git directory.",
+            )
+        })?;
+
+    Ok(PathBuf::from(common).join("info").join("exclude"))
+}
+
+/// Appends the exclusion, leaving anything already there alone.
+fn append_exclusion(exclude: &Path) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let existing = std::fs::read_to_string(exclude).unwrap_or_default();
+    let pattern = format!("{}/", capture::EXCLUDED_PATH);
+
+    // Already listed but not taking effect — a later negation, say. Adding a
+    // second copy would not help and would look like a bug to whoever reads it.
+    if existing.lines().any(|line| line.trim() == pattern) {
+        return Ok(());
+    }
+
+    if let Some(parent) = exclude.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(exclude)?;
+
+    // Git's default file ends without a trailing newline often enough to matter.
+    let separator = if existing.is_empty() || existing.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
+
+    write!(file, "{separator}\n# Diff Trek AI changelogs\n{pattern}\n")
 }
 
 /// Runs Git for its exit status rather than its output, which `command::run`
@@ -114,6 +207,8 @@ pub struct Created {
     pub hunks: usize,
     /// Changelogs deleted for age while we were here.
     pub reaped: Vec<String>,
+    /// Set when the changelog folder had to be excluded on the way past.
+    pub ignored: Option<String>,
 }
 
 /// Writes a fresh changelog for the current diff.
@@ -122,9 +217,9 @@ pub struct Created {
 /// point: nobody retypes diff text, so nobody can mangle it, and the nonce can
 /// be checked against the text it is about to annotate.
 pub fn create(root: &Path, comparison: &Comparison, author: &str) -> AppResult<Created> {
-    if let Some(message) = ignore_state(root).message() {
-        return Err(AppError::new(ErrorKind::GitCommandFailed, message));
-    }
+    // Before the diff is captured, so an exclusion added now keeps the folder
+    // out of the very diff this changelog is about.
+    let ignored = ensure_ignored(root)?;
 
     let diff = capture_diff(root, comparison)?;
     if diff.trim().is_empty() {
@@ -161,6 +256,7 @@ pub fn create(root: &Path, comparison: &Comparison, author: &str) -> AppResult<C
         nonce,
         hunks,
         reaped,
+        ignored,
     })
 }
 
@@ -312,18 +408,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_ignore_message_names_both_cures_and_says_which_is_invisible() {
-        let message = IgnoreState::NotIgnored.message().unwrap();
-        assert!(message.contains(".gitignore"));
-        assert!(message.contains(".git/info/exclude"));
-        assert!(message.contains("won't appear in your diff"));
+    fn only_a_tracked_folder_is_something_the_user_has_to_fix() {
+        // The other two are handled: already ignored, or ignored on the way
+        // past. Tracking is the one an ignore rule cannot undo.
         assert!(IgnoreState::Ignored.message().is_none());
-    }
-
-    #[test]
-    fn an_already_tracked_folder_is_told_apart_from_an_unignored_one() {
-        let message = IgnoreState::Tracked.message().unwrap();
-        assert!(message.contains("git rm -r --cached"));
+        assert!(IgnoreState::NotIgnored.message().is_none());
+        assert!(IgnoreState::Tracked
+            .message()
+            .unwrap()
+            .contains("git rm -r --cached"));
     }
 
     #[test]

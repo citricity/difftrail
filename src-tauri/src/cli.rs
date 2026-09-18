@@ -47,6 +47,12 @@ fn create_changelog(author: &str) -> i32 {
         Err(error) => return fail(&error),
     };
 
+    // Everything but the path goes to stderr, so the first line of stdout is
+    // always the file and a caller can take it with `head -1`.
+    if let Some(note) = &created.ignored {
+        eprintln!("{note}\n");
+    }
+
     println!("{}", created.path.display());
     println!();
     println!("{}", instructions(&created.nonce, created.hunks));

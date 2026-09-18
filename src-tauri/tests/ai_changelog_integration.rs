@@ -169,15 +169,58 @@ fn the_exclusion_holds_when_run_from_a_subdirectory() {
 }
 
 #[test]
-fn nothing_is_written_until_the_folder_is_ignored() {
+fn an_unignored_folder_is_excluded_on_the_way_past() {
+    // Refusing would be tidier in principle: in practice the thing running this
+    // is an agent halfway through a task, which would either give up or start
+    // improvising with .gitignore — a tracked file, whose edit would land in
+    // the diff under review.
     let repo = Repo::new("unignored");
+    fs::write(repo.root.join(".git/info/exclude"), "# nothing here\n").unwrap();
+    repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
+
+    let created = create(&repo);
+
+    assert!(created.ignored.unwrap().contains("info/exclude"));
+    let exclude = fs::read_to_string(repo.root.join(".git/info/exclude")).unwrap();
+    assert!(exclude.contains(".difftrek/"));
+    assert!(exclude.contains("# nothing here"), "kept what was there");
+
+    // And it took effect for the diff this changelog is about.
+    let changelog = format::parse(&repo.read_changelog(&created.nonce)).unwrap();
+    assert!(!changelog.clean_diff.contains(".difftrek"));
+}
+
+#[test]
+fn the_exclusion_is_written_once_and_says_nothing_the_second_time() {
+    let repo = Repo::new("unignored-twice");
     fs::write(repo.root.join(".git/info/exclude"), "").unwrap();
     repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
 
-    let error = service::create(&repo.root, &Comparison::WorkingTree, "claude").unwrap_err();
+    assert!(create(&repo).ignored.is_some());
+    assert!(create(&repo).ignored.is_none());
 
-    assert!(error.message.contains(".git/info/exclude"));
-    assert!(storage::list(&repo.root).is_empty());
+    let exclude = fs::read_to_string(repo.root.join(".git/info/exclude")).unwrap();
+    assert_eq!(exclude.matches(".difftrek/").count(), 1);
+}
+
+#[test]
+fn a_gitignore_of_the_users_own_is_left_alone() {
+    let repo = Repo::new("own-gitignore");
+    repo.write(".gitignore", "node_modules/\n");
+    repo.git(&["add", "-A"]);
+    repo.git(&["commit", "-m", "ignore node_modules"]);
+    fs::write(repo.root.join(".git/info/exclude"), "").unwrap();
+    repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
+
+    create(&repo);
+
+    // The tracked file is untouched, so nothing of ours appears in the diff.
+    assert_eq!(
+        fs::read_to_string(repo.root.join(".gitignore")).unwrap(),
+        "node_modules/\n"
+    );
+    assert!(repo.git(&["status", "--short"]).contains("src/one.ts"));
+    assert!(!repo.git(&["status", "--short"]).contains(".gitignore"));
 }
 
 #[test]
