@@ -548,6 +548,11 @@ export function DiffDocument({
                 <HunkNoteIcon
                   state={notes.state(hunk.id)}
                   partial={notes.hunks[hunk.id]?.partial ?? false}
+                  changeLabel={
+                    notes.hunks[hunk.id]?.logicalChangeIds[0] === undefined
+                      ? null
+                      : notes.labelOf(notes.hunks[hunk.id].logicalChangeIds[0])
+                  }
                   onOpen={() => notes.onOpenHunk(hunk.id)}
                 />
               ) : null

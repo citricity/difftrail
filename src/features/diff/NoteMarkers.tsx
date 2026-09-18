@@ -86,6 +86,12 @@ interface HunkNoteProps {
   state: HunkNoteState;
   /** The hunk has grown around its notes since they were written. */
   partial: boolean;
+  /**
+   * The label of the first logical change covering this hunk, if any. The icon
+   * borrows that change's lane colour, so the hunks making up one intent can be
+   * picked out down the gutter without opening anything.
+   */
+  changeLabel?: string | null;
   onOpen: () => void;
 }
 
@@ -105,11 +111,24 @@ interface HunkNoteProps {
  * A note that only covers part of what its hunk now does carries an
  * exclamation mark.
  */
-function HunkNoteIconImpl({ state, partial, onOpen }: HunkNoteProps) {
+function HunkNoteIconImpl({
+  state,
+  partial,
+  changeLabel = null,
+  onOpen,
+}: HunkNoteProps) {
   if (state === 'changedSince') return null;
 
   const explained = state === 'explained';
   const Icon = explained ? MessageSquareText : MessageSquareDashed;
+
+  // Amber for a hunk nobody explained; otherwise its change's lane, or the
+  // accent when the reason stands on its own with no change to belong to.
+  const colour = !explained
+    ? 'var(--note-unexplained)'
+    : changeLabel === null
+      ? 'var(--accent)'
+      : laneColour(changeLabel);
 
   const label = !explained
     ? 'No reason was recorded for this hunk'
@@ -120,7 +139,8 @@ function HunkNoteIconImpl({ state, partial, onOpen }: HunkNoteProps) {
   return (
     <button
       type="button"
-      className={`${styles.hunkNote} ${explained ? '' : styles.unexplained}`}
+      className={styles.hunkNote}
+      style={{ '--note-colour': colour } as CSSProperties}
       title={label}
       aria-label={label}
       onClick={(event) => {

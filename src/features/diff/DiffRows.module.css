@@ -664,18 +664,14 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  /* Set per icon: its logical change's lane, the accent for a reason that
+     belongs to no change, or amber for a hunk nobody explained. */
+  color: var(--note-colour, var(--text-muted));
   cursor: pointer;
 }
 
 .hunkNote:hover {
   background: var(--surface-hover);
-  color: var(--text);
-}
-
-/* Nothing was recorded for this hunk — often a change nobody meant to make. */
-.unexplained {
-  color: var(--note-unexplained);
 }
 
 /* The note covers part of what this hunk now does: something was edited
