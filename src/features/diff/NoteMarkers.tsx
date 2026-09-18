@@ -49,8 +49,8 @@ interface BadgesProps {
  * is no line joining the two: the markers are enough, and a rule down the
  * gutter would compete with the code for attention.
  *
- * Beside the letter, a stacked pair of chevrons where there is somewhere to
- * go: they travel the change rather than the document, so from the start of a
+ * Beside the letter, the arrows that travel its change where there is
+ * somewhere to go: they travel the change rather than the document, so from the start of a
  * run they lead to the run before it and to this run's far end, and from its
  * end back to where this run began and on to the next one. Without them a
  * hollow badge reads as the end of the change rather than the end of one of
@@ -122,9 +122,6 @@ function LogicalBadgesImpl({
             </button>
 
             {onJump !== undefined && (up !== null || down !== null) && (
-              // Stacked rather than side by side: two arrows cost one column
-              // of the gutter this way, and up over down reads as the
-              // direction each one travels.
               <span className={styles.jumps} style={lane}>
                 {up !== null && (
                   <button
@@ -137,7 +134,7 @@ function LogicalBadgesImpl({
                       onJump(change, up);
                     }}
                   >
-                    <ChevronUp size={10} aria-hidden="true" />
+                    <ChevronUp size={11} aria-hidden="true" />
                   </button>
                 )}
 
@@ -152,7 +149,7 @@ function LogicalBadgesImpl({
                       onJump(change, down);
                     }}
                   >
-                    <ChevronDown size={10} aria-hidden="true" />
+                    <ChevronDown size={11} aria-hidden="true" />
                   </button>
                 )}
               </span>
