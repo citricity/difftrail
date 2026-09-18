@@ -285,12 +285,11 @@ fn an_edit_elsewhere_in_the_file_keeps_the_note() {
 }
 
 #[test]
-fn an_edit_that_merges_into_the_hunk_reads_as_changed_since() {
-    // The limit of content matching, recorded deliberately. Inserting a line
-    // within a few lines of the AI's change puts it inside the same hunk, so
-    // the hunk's changed lines are no longer the ones the note was written for
-    // and the note is not shown. Saying "this changed since" is truthful;
-    // showing the note anyway would be the one thing matching must never do.
+fn an_edit_that_merges_into_the_hunk_keeps_the_note_as_partial() {
+    // Inserting a line within a few lines of the AI's change puts it inside the
+    // same hunk. The note still describes exactly the lines it was written for,
+    // so it is shown — and marked, because the hunk now does more than it
+    // accounts for.
     let repo = Repo::new("merged-edit");
     repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
 
@@ -303,10 +302,12 @@ fn an_edit_that_merges_into_the_hunk_reads_as_changed_since() {
     );
 
     let loaded = service::load(&repo.root, &Comparison::WorkingTree).expect("loaded");
+    let hunk = &loaded.annotations.hunks["src/one.ts:hunk:0"];
 
-    assert!(loaded.annotations.hunks.is_empty());
-    assert_eq!(loaded.annotations.summary.changed_since(), 1);
-    assert_eq!(loaded.annotations.summary.stale_notes, 1);
+    assert_eq!(hunk.reasons, ["caps in one.ts"]);
+    assert!(hunk.partial);
+    assert_eq!(loaded.annotations.summary.stale_notes, 0);
+    assert!(!loaded.annotations.summary.is_complete());
 }
 
 #[test]

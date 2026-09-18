@@ -10,13 +10,17 @@
 //! is by content, never by line number — every line number below an edit moves
 //! — and never approximate.
 //!
-//! Two passes:
+//! Three passes, each looser than the last:
 //!
 //! 1. the whole hunk body, byte for byte;
-//! 2. the `+`/`-` lines alone, for whatever is left. This one earns its keep:
-//!    editing a line three above the AI's change rewrites the hunk's *context*
-//!    while its edit is untouched, and pass one alone would throw away a note
-//!    that is still perfectly good.
+//! 2. the `+`/`-` lines alone, which survives an edit that rewrites the hunk's
+//!    *context* while leaving its change untouched;
+//! 3. the `+`/`-` lines appearing contiguously, in order, inside a larger
+//!    hunk's. This is the common case of a reader adding a line within a few
+//!    lines of the AI's change: Git merges it into the same hunk, so the hunk
+//!    now does slightly more than the note describes. The note still describes
+//!    exactly the lines it was written for, so it is shown — and marked
+//!    `partial`, because the hunk has grown around it.
 //!
 //! Matching is by content *group*, not by position: where the same hunk appears
 //! several times in a file — which is what non-DRY code looks like — every
@@ -39,6 +43,11 @@ pub struct ResolvedHunk {
     /// Set when `reasons` holds more than one, so the UI can say these cover
     /// identical changes rather than pretending to know which applies.
     pub ambiguous: bool,
+    /// The hunk contains the lines these reasons were written for, and more
+    /// besides — something was edited alongside them since. Everything shown is
+    /// still about lines the author really wrote about; the rest of the hunk is
+    /// unaccounted for.
+    pub partial: bool,
 }
 
 impl ResolvedHunk {
@@ -59,15 +68,19 @@ pub struct MatchSummary {
     pub total: usize,
     /// Matched hunks with no reason and no logical change.
     pub unexplained: usize,
+    /// Matched hunks that have grown around their notes since.
+    pub partial: usize,
     /// Notes describing hunks the live diff no longer has: the changelog was
     /// written, then the code moved on.
     pub stale_notes: usize,
 }
 
 impl MatchSummary {
-    /// Every hunk on screen is accounted for, and nothing has been left behind.
+    /// The changelog describes this diff exactly: every hunk on screen is
+    /// accounted for, nothing was left behind, and no hunk has grown around its
+    /// note. Anything less is worth telling the reader about.
     pub fn is_complete(&self) -> bool {
-        self.matched == self.total && self.stale_notes == 0
+        self.matched == self.total && self.stale_notes == 0 && self.partial == 0
     }
 
     /// Hunks that changed since the notes were written — usually the reader's
@@ -146,13 +159,10 @@ pub fn annotate(changelog: &Changelog, live_diff: &str) -> Annotations {
         note.changed_lines().is_empty()
     });
 
-    let mut hunks = HashMap::new();
-    let mut matched = 0;
-    let mut unexplained = 0;
+    let mut hunks: HashMap<String, ResolvedHunk> = HashMap::new();
 
+    // Passes one and two: this hunk is exactly what was annotated.
     for note in &live {
-        let id = hunk_id(&note.path, note.index);
-
         let group = match exact.get_mut(&body_key(note)) {
             Some(group) => Some(group),
             None if !note.changed_lines().is_empty() => loose.get_mut(&changed_key(note)),
@@ -164,20 +174,82 @@ pub fn annotate(changelog: &Changelog, live_diff: &str) -> Annotations {
         };
 
         group.used = true;
-        matched += 1;
+        let id = hunk_id(&note.path, note.index);
 
-        let resolved = ResolvedHunk {
-            hunk_id: id.clone(),
-            reasons: group.reasons.clone(),
-            logical_change_ids: group.logical_change_ids.clone(),
-            ambiguous: group.reasons.len() > 1,
-        };
+        hunks.insert(
+            id.clone(),
+            ResolvedHunk {
+                hunk_id: id,
+                reasons: group.reasons.clone(),
+                logical_change_ids: group.logical_change_ids.clone(),
+                ambiguous: group.reasons.len() > 1,
+                partial: false,
+            },
+        );
+    }
 
-        if resolved.is_unexplained() {
-            unexplained += 1;
+    // Pass three: the annotated lines are in this hunk, with company. More than
+    // one note can apply — an edit between two annotated changes merges both
+    // into one hunk — and each still describes the lines it was written for.
+    for note in &live {
+        let id = hunk_id(&note.path, note.index);
+        let changed = note.changed_lines();
+
+        if hunks.contains_key(&id) || changed.is_empty() {
+            continue;
         }
 
-        hunks.insert(id, resolved);
+        let mut reasons: Vec<String> = Vec::new();
+        let mut logical_change_ids: Vec<String> = Vec::new();
+        let mut applied: Vec<(String, String)> = Vec::new();
+
+        // Walked in the changelog's own order, not the map's: several reasons
+        // shown against one hunk must come out in the same order every time.
+        for candidate in &changelog.notes {
+            let annotated = candidate.changed_lines();
+            if candidate.path != note.path || !contains_run(&changed, &annotated) {
+                continue;
+            }
+
+            let key = changed_key(candidate);
+            if applied.contains(&key) {
+                continue;
+            }
+            applied.push(key.clone());
+
+            let Some(group) = loose.get_mut(&key) else {
+                continue;
+            };
+            group.used = true;
+
+            for reason in &group.reasons {
+                if !reasons.contains(reason) {
+                    reasons.push(reason.clone());
+                }
+            }
+            for change in &group.logical_change_ids {
+                if !logical_change_ids.contains(change) {
+                    logical_change_ids.push(change.clone());
+                }
+            }
+        }
+
+        if applied.is_empty() {
+            continue;
+        }
+
+        hunks.insert(
+            id.clone(),
+            ResolvedHunk {
+                hunk_id: id,
+                reasons,
+                logical_change_ids,
+                // Not ambiguous: these notes are about different lines of one
+                // hunk, not competing accounts of the same change.
+                ambiguous: false,
+                partial: true,
+            },
+        );
     }
 
     // A note is stale only when *neither* pass could place it — a note picked
@@ -198,13 +270,21 @@ pub fn annotate(changelog: &Changelog, live_diff: &str) -> Annotations {
 
     Annotations {
         summary: MatchSummary {
-            matched,
+            matched: hunks.len(),
             total: live.len(),
-            unexplained,
+            unexplained: hunks.values().filter(|hunk| hunk.is_unexplained()).count(),
+            partial: hunks.values().filter(|hunk| hunk.partial).count(),
             stale_notes,
         },
         hunks,
     }
+}
+
+/// Whether `needle` appears in `haystack` contiguously and in order.
+fn contains_run(haystack: &[&str], needle: &[&str]) -> bool {
+    !needle.is_empty()
+        && needle.len() <= haystack.len()
+        && haystack.windows(needle.len()).any(|window| window == needle)
 }
 
 #[cfg(test)]
@@ -335,6 +415,87 @@ mod tests {
         assert_eq!(annotations.summary.changed_since(), 1);
         assert!(annotations.hunks["src/two.ts:hunk:0"].is_unexplained());
         assert_eq!(annotations.summary.unexplained, 1);
+    }
+
+    #[test]
+    fn an_edit_alongside_the_change_keeps_the_note_and_marks_it_partial() {
+        // The reader added a line close enough that Git merged it into the same
+        // hunk. The note still describes exactly the lines it was written for.
+        let changelog = annotated(&two_file_diff(), &[("h1", "Fix the count")]);
+        let live = [
+            "diff --git a/src/one.ts b/src/one.ts",
+            "--- a/src/one.ts",
+            "+++ b/src/one.ts",
+            "@@ -1,3 +1,5 @@",
+            "+introduced();",
+            " before();",
+            "-const b = 2;",
+            "+const b = 3;",
+            "",
+        ]
+        .join("\n");
+
+        let hunk = &annotate(&changelog, &live).hunks["src/one.ts:hunk:0"];
+
+        assert_eq!(hunk.reasons, ["Fix the count"]);
+        assert!(hunk.partial);
+        assert!(!hunk.ambiguous);
+    }
+
+    #[test]
+    fn two_notes_merged_into_one_hunk_are_both_shown() {
+        let diff = [
+            "diff --git a/src/one.ts b/src/one.ts",
+            "--- a/src/one.ts",
+            "+++ b/src/one.ts",
+            "@@ -1,2 +1,2 @@",
+            "-alpha();",
+            "+ALPHA();",
+            "@@ -20,2 +20,2 @@",
+            "-omega();",
+            "+OMEGA();",
+            "",
+        ]
+        .join("\n");
+        let changelog = annotated(&diff, &[("h1", "Shout alpha"), ("h2", "Shout omega")]);
+
+        // The reader edited the lines between them, so the two hunks are one.
+        let live = [
+            "diff --git a/src/one.ts b/src/one.ts",
+            "--- a/src/one.ts",
+            "+++ b/src/one.ts",
+            "@@ -1,20 +1,20 @@",
+            "-alpha();",
+            "+ALPHA();",
+            "-middle();",
+            "+MIDDLE();",
+            "-omega();",
+            "+OMEGA();",
+            "",
+        ]
+        .join("\n");
+
+        let annotations = annotate(&changelog, &live);
+        let hunk = &annotations.hunks["src/one.ts:hunk:0"];
+
+        assert_eq!(hunk.reasons, ["Shout alpha", "Shout omega"]);
+        assert!(hunk.partial);
+        // Both notes were placed, so neither is stale — but the hunk does more
+        // than they account for, so this is not a complete match.
+        assert_eq!(annotations.summary.stale_notes, 0);
+        assert_eq!(annotations.summary.partial, 1);
+        assert!(!annotations.summary.is_complete());
+    }
+
+    #[test]
+    fn the_annotated_lines_have_to_be_together_and_in_order() {
+        assert!(contains_run(&["a", "b", "c"], &["b", "c"]));
+        assert!(contains_run(&["a", "b"], &["a", "b"]));
+        // Scattered through the hunk is not the change that was annotated.
+        assert!(!contains_run(&["a", "x", "b"], &["a", "b"]));
+        assert!(!contains_run(&["a", "b"], &["b", "a"]));
+        assert!(!contains_run(&["a"], &["a", "b"]));
+        assert!(!contains_run(&["a"], &[]));
     }
 
     #[test]
