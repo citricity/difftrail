@@ -1,0 +1,107 @@
+import { describe, expect, it } from 'vitest';
+import { buildNoteMarkers, fileOfHunk, hunksOfChange } from './noteMarkers.ts';
+import type { ResolvedHunk } from '../types/index.ts';
+
+function hunk(logicalChangeIds: string[]): ResolvedHunk {
+  return {
+    hunkId: '',
+    reasons: [],
+    logicalChangeIds,
+    ambiguous: false,
+    partial: false,
+  };
+}
+
+function markersFor(
+  order: string[],
+  membership: Record<string, string[]>,
+): Record<string, { starts: string[]; ends: string[]; inside: string[] }> {
+  const hunks = Object.fromEntries(
+    Object.entries(membership).map(([id, changes]) => [id, hunk(changes)]),
+  );
+
+  return Object.fromEntries(buildNoteMarkers(order, hunks));
+}
+
+describe('buildNoteMarkers', () => {
+  it('marks both ends of a run that covers several hunks', () => {
+    const markers = markersFor(['a', 'b', 'c'], {
+      a: ['0'],
+      b: ['0'],
+      c: ['0'],
+    });
+
+    expect(markers.a).toEqual({ starts: ['0'], ends: [], inside: [] });
+    expect(markers.b).toEqual({ starts: [], ends: [], inside: ['0'] });
+    expect(markers.c).toEqual({ starts: [], ends: ['0'], inside: [] });
+  });
+
+  it('starts and ends a single-hunk change on the same hunk', () => {
+    const markers = markersFor(['a'], { a: ['0'] });
+    expect(markers.a).toEqual({ starts: ['0'], ends: ['0'], inside: [] });
+  });
+
+  it('gives a re-opened span a marker at each end of each run', () => {
+    // "Hunks 1 and 3 but not 2" — which is the whole reason spans re-open.
+    const markers = markersFor(['a', 'b', 'c'], { a: ['0'], c: ['0'] });
+
+    expect(markers.a).toEqual({ starts: ['0'], ends: ['0'], inside: [] });
+    expect(markers.b).toBeUndefined();
+    expect(markers.c).toEqual({ starts: ['0'], ends: ['0'], inside: [] });
+  });
+
+  it('keeps overlapping changes apart', () => {
+    const markers = markersFor(['a', 'b', 'c'], {
+      a: ['0'],
+      b: ['0', '1'],
+      c: ['1'],
+    });
+
+    expect(markers.a).toEqual({ starts: ['0'], ends: [], inside: [] });
+    expect(markers.b).toEqual({ starts: ['1'], ends: ['0'], inside: [] });
+    expect(markers.c).toEqual({ starts: [], ends: ['1'], inside: [] });
+  });
+
+  it('has nothing to say about a hunk no change covers', () => {
+    const markers = markersFor(['a', 'b'], { a: [], b: [] });
+    expect(markers).toEqual({});
+  });
+
+  it('treats a gap in the order as a gap', () => {
+    // The middle file has not loaded, so its hunks are not in the document.
+    // The change still shows where it begins and ends among what is here.
+    const markers = markersFor(['a', 'z'], { a: ['0'], z: ['0'] });
+
+    expect(markers.a.starts).toEqual(['0']);
+    expect(markers.z.ends).toEqual(['0']);
+  });
+});
+
+describe('hunksOfChange', () => {
+  it('lists the hunks a change covers, in document order', () => {
+    const hunks = {
+      a: hunk(['0']),
+      b: hunk(['1']),
+      c: hunk(['0', '1']),
+    };
+
+    expect(hunksOfChange(['a', 'b', 'c'], hunks, '0')).toEqual(['a', 'c']);
+    expect(hunksOfChange(['a', 'b', 'c'], hunks, '1')).toEqual(['b', 'c']);
+    expect(hunksOfChange(['a', 'b', 'c'], hunks, '2')).toEqual([]);
+  });
+});
+
+describe('fileOfHunk', () => {
+  it('reads the file out of a hunk id', () => {
+    expect(fileOfHunk('src/lib/rows.ts:hunk:3')).toBe('src/lib/rows.ts');
+    expect(fileOfHunk('a.ts:hunk:0')).toBe('a.ts');
+  });
+
+  it('keeps a path that contains the separator intact', () => {
+    expect(fileOfHunk('weird/:hunk:/name.ts:hunk:1')).toBe('weird/:hunk:/name.ts');
+  });
+
+  it('leaves something that is not a hunk id alone', () => {
+    expect(fileOfHunk('src/lib/rows.ts')).toBe('src/lib/rows.ts');
+  });
+});

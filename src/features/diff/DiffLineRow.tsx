@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { DiffLine } from '../../types/index.ts';
 import type { LineRun } from '../../lib/runs.ts';
 import { wrapRuns } from '../../lib/wrap.ts';
@@ -30,6 +30,12 @@ interface Props {
   /** Column to wrap at, or null to let the line scroll horizontally. */
   wrapColumn: number | null;
   active: boolean;
+  /**
+   * Logical change markers for this line, if the AI changelog has any. The
+   * column is rendered either way, so the line numbers stay in one column
+   * whether a row has markers or not.
+   */
+  notes?: ReactNode;
   /** Absolute position within the document canvas, set by the virtualiser. */
   style: CSSProperties;
 }
@@ -40,7 +46,7 @@ interface Props {
  * Rendered thousands of times per session, so it stays a plain memoised
  * function of its props with no hooks and no derived state.
  */
-function DiffLineRowImpl({ line, runs, wrapColumn, active, style }: Props) {
+function DiffLineRowImpl({ line, runs, wrapColumn, active, notes, style }: Props) {
   const className = [
     styles.row,
     styles.line,
@@ -56,18 +62,30 @@ function DiffLineRowImpl({ line, runs, wrapColumn, active, style }: Props) {
     <div className={className} style={style} role="row" data-row="line">
       {wrapped.map((rowRuns, index) => (
         <span key={index} className={styles.visualLine}>
-          <span className={styles.gutter} aria-hidden="true">
+          <span className={styles.gutter}>
+            <span className={styles.notes}>
+              <span className={styles.lane}>{index === 0 ? notes : null}</span>
+            </span>
             {index === 0 ? (
               <>
-                <span className={styles.number}>{line.oldLineNumber ?? ''}</span>
-                <span className={styles.number}>{line.newLineNumber ?? ''}</span>
-                <span className={styles.marker}>{MARKER[line.kind]}</span>
+                <span className={styles.number} aria-hidden="true">
+                  {line.oldLineNumber ?? ''}
+                </span>
+                <span className={styles.number} aria-hidden="true">
+                  {line.newLineNumber ?? ''}
+                </span>
+                <span className={styles.marker} aria-hidden="true">
+                  {MARKER[line.kind]}
+                </span>
               </>
             ) : (
               <>
-                <span className={styles.number} />
-                <span className={styles.number} />
-                <span className={`${styles.marker} ${styles.continuation}`}>
+                <span className={styles.number} aria-hidden="true" />
+                <span className={styles.number} aria-hidden="true" />
+                <span
+                  className={`${styles.marker} ${styles.continuation}`}
+                  aria-hidden="true"
+                >
                   {CONTINUATION}
                 </span>
               </>

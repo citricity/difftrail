@@ -15,6 +15,21 @@ export type HunkNoteState =
   | 'unexplained'
   | 'changedSince';
 
+/**
+ * What `DiffDocument` needs to draw the markers: the resolved notes, the
+ * labels, and what to do when one is clicked. Assembled by `App`, so the
+ * document itself knows nothing about dialogs.
+ */
+export interface DocumentNotes {
+  hunks: Record<string, ResolvedHunk>;
+  state: (hunkId: string) => HunkNoteState;
+  labelOf: (change: string) => string;
+  /** One line for a marker's tooltip. */
+  describe: (change: string) => string;
+  onOpenHunk: (hunkId: string) => void;
+  onOpenChange: (change: string) => void;
+}
+
 export interface AiChangelogView {
   changelog: AiChangelog | null;
   /** The notes for one hunk, or null when the changelog never saw it. */
@@ -23,6 +38,8 @@ export interface AiChangelogView {
   logicalChange: (id: string) => LogicalChange | null;
   /** Display order of the logical changes, for labels and colours. */
   labelOf: (id: string) => string;
+  /** The change's description, for a marker's tooltip. */
+  describe: (id: string) => string;
 }
 
 const EMPTY: AiChangelog | null = null;
@@ -96,9 +113,14 @@ export function useAiChangelog(ready: boolean): AiChangelogView & {
 
   const labelOf = useCallback((id: string) => labels.get(id) ?? '?', [labels]);
 
+  const describe = useCallback(
+    (id: string) => logicalChange(id)?.description ?? 'Logical change',
+    [logicalChange],
+  );
+
   const reload = useCallback(() => {
     setAttempt((value) => value + 1);
   }, []);
 
-  return { changelog, hunk, state, logicalChange, labelOf, reload };
+  return { changelog, hunk, state, logicalChange, labelOf, describe, reload };
 }

@@ -17,7 +17,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { CSSProperties, ReactElement } from 'react';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { useElementSize } from '../../hooks/useElementSize.ts';
 import {
   SCROLL_MARGIN,
@@ -56,6 +56,10 @@ import { FileHeaderRow } from './FileHeaderRow.tsx';
 import type { FileListAnchor } from './FileHeaderRow.tsx';
 import { FileNavigator } from '../files/FileNavigator.tsx';
 import { HunkHeaderRow } from './HunkHeaderRow.tsx';
+import { HunkNoteIcon, LogicalBadges } from './NoteMarkers.tsx';
+import { buildNoteMarkers } from '../../lib/noteMarkers.ts';
+import type { HunkMarkers } from '../../lib/noteMarkers.ts';
+import type { DocumentNotes } from '../../hooks/useAiChangelog.ts';
 import { ImageRow } from './ImageRow.tsx';
 import { NoticeRow } from './NoticeRow.tsx';
 import styles from './DiffDocument.module.css';
@@ -104,6 +108,12 @@ interface Props {
    * receiver's business.
    */
   onViewportWidthChange?: (width: number) => void;
+  /**
+   * The AI changelog's notes for what is on screen, or null when there is no
+   * changelog — which is the ordinary case, and the one where the gutter is
+   * exactly as wide as it always was.
+   */
+  notes?: DocumentNotes | null;
 }
 
 export function DiffDocument({
@@ -124,6 +134,7 @@ export function DiffDocument({
   wrapColumn,
   viewMode,
   onViewportWidthChange,
+  notes = null,
 }: Props) {
   /**
    * The scrolling element, held twice on purpose.
@@ -193,6 +204,42 @@ export function DiffDocument({
     }
     return map;
   }, [files]);
+
+  /**
+   * Where each logical change's run of hunks starts and stops.
+   *
+   * Derived from the document's own order rather than from the changelog,
+   * because that is the question being asked: a file that has not loaded has no
+   * hunks here yet, and its markers appear when it does.
+   */
+  const noteMarkers = useMemo(() => {
+    if (!notes) return new Map<string, HunkMarkers>();
+
+    const order = model.rows
+      .filter((row) => row.kind === 'hunk-header')
+      .map((row) => row.hunkId);
+
+    return buildNoteMarkers(order, notes.hunks);
+  }, [model, notes]);
+
+  const badgesFor = (hunk: DiffHunk, lineIndex: number): ReactNode => {
+    const marks = noteMarkers.get(hunk.id);
+    if (!notes || marks === undefined) return null;
+
+    const starts = lineIndex === 0 ? marks.starts : [];
+    const ends = lineIndex === hunk.lines.length - 1 ? marks.ends : [];
+    if (starts.length === 0 && ends.length === 0) return null;
+
+    return (
+      <LogicalBadges
+        starts={starts}
+        ends={ends}
+        labelOf={notes.labelOf}
+        describe={notes.describe}
+        onOpen={notes.onOpenChange}
+      />
+    );
+  };
 
   /**
    * Where the document last put `scrollTop` itself, until the scroll event that
@@ -496,6 +543,15 @@ export function DiffDocument({
             hunk={hunk}
             active={current?.hunkId === hunk.id}
             onSelect={() => onSelect({ fileId: row.fileId, hunkId: hunk.id })}
+            note={
+              notes ? (
+                <HunkNoteIcon
+                  state={notes.state(hunk.id)}
+                  partial={notes.hunks[hunk.id]?.partial ?? false}
+                  onOpen={() => notes.onOpenHunk(hunk.id)}
+                />
+              ) : null
+            }
           />,
         );
         break;
@@ -519,6 +575,7 @@ export function DiffDocument({
             wrapColumn={wrapColumn}
             offset={offset}
             active={current?.hunkId === hunk.id}
+            notes={badgesFor(hunk, row.left ?? row.right ?? 0)}
           />,
         );
         break;
@@ -537,6 +594,7 @@ export function DiffDocument({
             runs={runsForLine(hunk, row.lineIndex)}
             wrapColumn={wrapColumn}
             active={current?.hunkId === hunk.id}
+            notes={badgesFor(hunk, row.lineIndex)}
           />,
         );
         break;

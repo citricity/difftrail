@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StartupError } from './components/StartupError.tsx';
 import { DiffDocument } from './features/diff/DiffDocument.tsx';
+import { NoteDialogs } from './features/diff/NoteDialogs.tsx';
+import type { NoteDialog } from './features/diff/NoteDialogs.tsx';
 import { NavigationControls } from './features/navigation/NavigationControls.tsx';
 import { ViewModeToggle } from './features/navigation/ViewModeToggle.tsx';
 import { RepositoryHeader } from './features/repository/RepositoryHeader.tsx';
@@ -17,10 +19,12 @@ import { NotARepository } from './features/gitAlias/NotARepository.tsx';
 import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
+import { useAiChangelog } from './hooks/useAiChangelog.ts';
 import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
 import { useRowMetrics } from './hooks/useRowMetrics.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import { autoWrapColumn, buildRowModel } from './lib/rows.ts';
+import { fileOfHunk } from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
 import type { ViewMode } from './types/index.ts';
 import styles from './App.module.css';
@@ -46,7 +50,31 @@ export function App() {
     revealContext,
   } = useRepositoryDiff();
 
-  const metrics = useRowMetrics();
+  /**
+   * The AI changelog for what is on screen, if an agent wrote one.
+   *
+   * Loaded once the file list is in, because a changelog describes a diff and
+   * there is nothing to describe before that.
+   */
+  const changelog = useAiChangelog(state.phase !== 'starting');
+  const hasNotes = changelog.changelog !== null;
+
+  /**
+   * The markers need room in the gutter, and auto wrapping reads the gutter's
+   * width from the document root — so the flag lives there rather than on a
+   * container, and the metrics are re-measured when it changes.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (hasNotes) root.dataset.aiChangelog = 'true';
+    else delete root.dataset.aiChangelog;
+
+    return () => {
+      delete root.dataset.aiChangelog;
+    };
+  }, [hasNotes]);
+
+  const metrics = useRowMetrics(hasNotes);
   const settingsState = useSettings();
   const { wrap, wrapLength } = settingsState.settings;
 
@@ -107,6 +135,29 @@ export function App() {
   );
 
   const navigation = useDiffNavigation(state.files, ensureLoaded);
+
+  /** Which note dialog is open, if any. */
+  const [noteDialog, setNoteDialog] = useState<NoteDialog>(null);
+
+  const documentNotes = useMemo(() => {
+    if (changelog.changelog === null) return null;
+
+    return {
+      hunks: changelog.changelog.hunks,
+      state: changelog.state,
+      labelOf: changelog.labelOf,
+      describe: changelog.describe,
+      onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
+      onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
+    };
+  }, [changelog]);
+
+  /** Every hunk the document holds, in order — what a change's hunk list needs. */
+  const hunkOrder = useMemo(
+    () =>
+      state.files.flatMap((file) => (file.diff?.hunks ?? []).map((hunk) => hunk.id)),
+    [state.files],
+  );
 
   useKeyboardShortcuts({
     onNext: navigation.goNext,
@@ -170,7 +221,27 @@ export function App() {
         wrapColumn={wrapColumn}
         viewMode={viewMode}
         onViewportWidthChange={reportViewportWidth}
+        notes={documentNotes}
       />
+
+      {changelog.changelog !== null && (
+        <NoteDialogs
+          open={noteDialog}
+          notes={changelog}
+          order={hunkOrder}
+          onClose={() => setNoteDialog(null)}
+          onGoToHunk={(fileId, hunkId) => navigation.goTo({ fileId, hunkId })}
+          onOpenChange={(changeId) => {
+            const first = hunkOrder.find((id) =>
+              changelog.hunk(id)?.logicalChangeIds.includes(changeId),
+            );
+            if (first !== undefined) {
+              navigation.goTo({ fileId: fileOfHunk(first), hunkId: first });
+            }
+            setNoteDialog(null);
+          }}
+        />
+      )}
     </div>
   );
 }

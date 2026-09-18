@@ -1,0 +1,207 @@
+.dialog {
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+
+.header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.close {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* A hunk that has grown around its note, or identical hunks given different
+   reasons: the reader is told what is being claimed and what is not. */
+.warning {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.warning span {
+  color: var(--note-unexplained);
+  font-weight: 700;
+}
+
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.accordion {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.summary:hover {
+  background: var(--surface-hover);
+}
+
+.label {
+  flex: 0 0 auto;
+  min-width: 15px;
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Collapsed: one line, cut off. The whole point of the accordion is that the
+   same intent repeats across hunks and the reader has usually read it. */
+.oneLine {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fullLine {
+  line-height: 1.45;
+}
+
+.accordionBody {
+  padding: 0 9px 9px;
+}
+
+.jump,
+.hunkLink {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.jump:hover,
+.hunkLink:hover {
+  text-decoration: underline;
+}
+
+.subtitle {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hunks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hunkLink {
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+}
+
+.issues {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.issue {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.issue:hover {
+  text-decoration: underline;
+}

@@ -52,7 +52,12 @@ function measureCharWidth(fontShorthand: string, fallback: number): number {
   return width > 0 ? width : fallback;
 }
 
-export function useRowMetrics(): RowMetrics {
+/**
+ * `changes` is anything that alters the tokens read below — today, whether a
+ * changelog is loaded, which widens the gutter. Measured once otherwise: these
+ * values come from CSS, and CSS does not move on its own.
+ */
+export function useRowMetrics(changes?: unknown): RowMetrics {
   const [metrics, setMetrics] = useState<RowMetrics>(FALLBACK);
 
   useEffect(() => {
@@ -104,7 +109,7 @@ export function useRowMetrics(): RowMetrics {
     }
 
     return undefined;
-  }, []);
+  }, [changes]);
 
   return metrics;
 }
