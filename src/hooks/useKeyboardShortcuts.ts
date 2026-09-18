@@ -11,6 +11,13 @@ export interface Shortcuts {
   onNext: () => void;
   onPrevious: () => void;
   /**
+   * The same step, one level up: through the logical changes rather than the
+   * hunks. Shifted, so a bigger jump is a bigger key press and there is
+   * nothing new to learn.
+   */
+  onNextChange?: () => void;
+  onPreviousChange?: () => void;
+  /**
    * Escape, when there is something to escape from — today, a focused logical
    * change. Left undefined otherwise, so Escape keeps meaning whatever the
    * browser and any open dialog make of it.
@@ -28,6 +35,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function useKeyboardShortcuts({
   onNext,
   onPrevious,
+  onNextChange,
+  onPreviousChange,
   onEscape,
 }: Shortcuts): void {
   useEffect(() => {
@@ -41,6 +50,18 @@ export function useKeyboardShortcuts({
         if (onEscape === undefined) return;
         event.preventDefault();
         onEscape();
+        return;
+      }
+
+      // Shifted: the same movement over logical changes.
+      const nextChange = event.key === 'N' || event.key === 'J';
+      const previousChange = event.key === 'P' || event.key === 'K';
+
+      if (nextChange || previousChange) {
+        const step = nextChange ? onNextChange : onPreviousChange;
+        if (step === undefined) return;
+        event.preventDefault();
+        step();
         return;
       }
 
@@ -58,5 +79,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
-  }, [onNext, onPrevious, onEscape]);
+  }, [onNext, onPrevious, onNextChange, onPreviousChange, onEscape]);
 }

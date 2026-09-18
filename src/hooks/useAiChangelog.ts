@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAiChangelog } from '../services/backend.ts';
+import { changeLabel } from '../lib/noteMarkers.ts';
 import type { AiChangelog, LogicalChange, ResolvedHunk } from '../types/index.ts';
 
 /**
@@ -79,11 +80,14 @@ export function useAiChangelog(ready: boolean): AiChangelogView & {
     };
   }, [ready, attempt]);
 
-  /** `A`, `B`, `C`… so a marker is readable without relying on its colour. */
+  /**
+   * `A`, `B`, `C`… so a marker is readable without relying on its colour, and
+   * `AA` onwards past twenty-six rather than starting again at `A`.
+   */
   const labels = useMemo(() => {
     const assigned = new Map<string, string>();
     changelog?.logicalChanges.forEach((change, index) => {
-      assigned.set(change.id, String.fromCharCode(65 + (index % 26)));
+      assigned.set(change.id, changeLabel(index));
     });
     return assigned;
   }, [changelog]);

@@ -616,9 +616,9 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 15px;
+  min-width: 15px;
   height: 15px;
-  padding: 0;
+  padding: 0 2px;
   border: 1px solid var(--note-lane);
   border-radius: var(--radius-sm);
   font-family: var(--font-ui);

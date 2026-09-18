@@ -140,3 +140,49 @@ describe('the logical change dialog', () => {
     expect(onGoToHunk).toHaveBeenCalledWith('src/one.ts', 'src/one.ts:hunk:0');
   });
 });
+
+describe('the contents dialog', () => {
+  it('lists the changes with a hunk on screen, and how much each covers', async () => {
+    const hunk = resolved();
+    const notes = view(hunk);
+    const onOpenChange = vi.fn();
+
+    render(
+      <NoteDialogs
+        open={{ kind: 'contents' }}
+        notes={notes}
+        order={[hunk.hunkId]}
+        currentChange="0"
+        onClose={vi.fn()}
+        onGoToHunk={vi.fn()}
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    // Change B covers nothing here, so it is not in the document's contents.
+    expect(screen.queryByText('Warm the dark colours')).not.toBeInTheDocument();
+    expect(screen.getByText('1 hunk')).toBeInTheDocument();
+
+    const entry = screen.getByRole('button', { name: /Reset the error count/ });
+    expect(entry).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.click(entry);
+    expect(onOpenChange).toHaveBeenCalledWith('0');
+  });
+
+  it('says when hunks belong to no change at all', () => {
+    const hunk = resolved({ logicalChangeIds: [], reasons: [] });
+    render(
+      <NoteDialogs
+        open={{ kind: 'contents' }}
+        notes={view(hunk)}
+        order={[hunk.hunkId]}
+        onClose={vi.fn()}
+        onGoToHunk={vi.fn()}
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/belongs to no logical change/)).toBeInTheDocument();
+  });
+});

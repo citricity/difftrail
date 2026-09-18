@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildNoteMarkers,
+  changeLabel,
+  changeOfHunk,
+  changesInOrder,
   fileOfHunk,
   focusFilter,
   hunksOfChange,
+  laneColour,
+  stepChange,
+  ungroupedHunks,
 } from './noteMarkers.ts';
 import type { ResolvedHunk } from '../types/index.ts';
 
@@ -139,5 +145,91 @@ describe('focusFilter', () => {
 
     expect(filter.hunk('src/one.ts:hunk:0')).toBe(false);
     expect(filter.file('src/one.ts')).toBe(false);
+  });
+});
+
+describe('changesInOrder', () => {
+  const hunks = {
+    a: hunk([]),
+    b: hunk(['1']),
+    c: hunk(['0', '1']),
+    d: hunk(['0']),
+  };
+
+  it('lists each change once, where it first appears', () => {
+    expect(changesInOrder(['a', 'b', 'c', 'd'], hunks)).toEqual([
+      { id: '1', hunkId: 'b' },
+      { id: '0', hunkId: 'c' },
+    ]);
+  });
+
+  it('follows the document, not the changelog table', () => {
+    expect(changesInOrder(['d', 'b'], hunks)).toEqual([
+      { id: '0', hunkId: 'd' },
+      { id: '1', hunkId: 'b' },
+    ]);
+  });
+
+  it('counts the hunks no change covers', () => {
+    expect(ungroupedHunks(['a', 'b', 'c', 'd'], hunks)).toBe(1);
+  });
+
+  it('names the first of several changes as the one a hunk reads as', () => {
+    expect(changeOfHunk(hunks, 'c')).toBe('0');
+    expect(changeOfHunk(hunks, 'a')).toBeNull();
+    expect(changeOfHunk(hunks, null)).toBeNull();
+  });
+});
+
+describe('stepChange', () => {
+  const hunks = {
+    a: hunk(['0']),
+    b: hunk([]),
+    c: hunk(['1']),
+    d: hunk(['2']),
+  };
+  const order = ['a', 'b', 'c', 'd'];
+  const changes = changesInOrder(order, hunks);
+
+  const step = (from: string | null, direction: 'next' | 'previous') =>
+    stepChange(changes, order, from, hunks, direction)?.id ?? null;
+
+  it('moves change by change, not span by span', () => {
+    expect(step('a', 'next')).toBe('1');
+    expect(step('c', 'previous')).toBe('0');
+  });
+
+  it('stops at the ends rather than wrapping, as the hunk arrows do', () => {
+    expect(step('d', 'next')).toBeNull();
+    expect(step('a', 'previous')).toBeNull();
+  });
+
+  it('enters at the top or the bottom when nothing is selected yet', () => {
+    expect(step(null, 'next')).toBe('0');
+    expect(step(null, 'previous')).toBe('2');
+  });
+
+  it('steps to the nearest change from a hunk that belongs to none', () => {
+    expect(step('b', 'next')).toBe('1');
+    expect(step('b', 'previous')).toBe('0');
+  });
+});
+
+describe('changeLabel', () => {
+  it('runs past Z rather than starting again at A', () => {
+    expect(changeLabel(0)).toBe('A');
+    expect(changeLabel(25)).toBe('Z');
+    expect(changeLabel(26)).toBe('AA');
+    expect(changeLabel(27)).toBe('AB');
+    expect(changeLabel(51)).toBe('AZ');
+    expect(changeLabel(52)).toBe('BA');
+  });
+
+  it('gives a two-letter label a lane of its own, not the lane of its first letter', () => {
+    expect(laneColour(changeLabel(0))).toBe('var(--note-lane-0)');
+    expect(laneColour(changeLabel(26))).toBe(
+      `var(--note-lane-${26 % 6})`,
+    );
+    expect(laneColour(changeLabel(26))).not.toBe(laneColour(changeLabel(0)));
   });
 });

@@ -14,6 +14,7 @@ import { memo } from 'react';
 import type { CSSProperties } from 'react';
 import { MessageSquareDashed, MessageSquareText } from 'lucide-react';
 import type { HunkNoteState } from '../../hooks/useAiChangelog.ts';
+import { laneColour } from '../../lib/noteMarkers.ts';
 import styles from './DiffRows.module.css';
 
 /** Past this, the rest become a `+n` rather than squeezing the column. */
@@ -159,12 +160,3 @@ function HunkNoteIconImpl({
 }
 
 export const HunkNoteIcon = memo(HunkNoteIconImpl);
-
-/**
- * A lane colour from the change's letter, rather than from the order the UI
- * happened to draw things in.
- */
-function laneColour(label: string): string {
-  const index = (label.charCodeAt(0) - 65 + 26) % 26;
-  return `var(--note-lane-${index % 6})`;
-}

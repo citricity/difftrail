@@ -236,3 +236,106 @@
 .focusButton:hover {
   text-decoration: underline;
 }
+
+/* The contents list: every logical change in the diff, in the order they
+   appear. One row per change, each with its own badge so the list and the
+   gutter read as the same thing. */
+.contents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.entry {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.entryButton {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  text-align: left;
+  cursor: default;
+}
+
+.entryButton:hover {
+  background: var(--surface-hover);
+}
+
+/* Where the reader is now. A left edge in the change's own colour, rather
+   than a tick, so it reads as a position rather than as a selection. */
+.entryButton[aria-current='true'] {
+  border-color: var(--border-subtle);
+  background: var(--surface);
+}
+
+.entryLabel {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: var(--note-lane);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.entryText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.entryMeta {
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+.entryFocus {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.entryFocus:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.entryFocusOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}

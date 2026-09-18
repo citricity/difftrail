@@ -1,51 +1,29 @@
 /**
  * What the toolbar says about the AI changelog.
  *
- * Two small chips, both of which only appear when there is something to say:
- * the logical change the reader has focused, and a warning when the changelog
- * no longer describes the whole diff.
+ * One chip, and only when there is something to say: the changelog no longer
+ * describes the whole diff. Which change the reader is in, and the narrowing
+ * of Previous/Next to one of them, belong to the change bar under the toolbar
+ * rather than here — one concept, one home.
  */
 
-import { MessageSquareDashed, X } from 'lucide-react';
+import { MessageSquareDashed } from 'lucide-react';
 import { changedSince, isComplete } from '../../types/index.ts';
 import type { MatchSummary } from '../../types/index.ts';
 import styles from './NoteStatus.module.css';
 
 interface Props {
   summary: MatchSummary;
-  /** The focused logical change, or null when the whole diff is in play. */
-  focus: { label: string; description: string } | null;
-  onClearFocus: () => void;
 }
 
-export function NoteStatus({ summary, focus, onClearFocus }: Props) {
-  return (
-    <div className={styles.status}>
-      {focus !== null && (
-        <span className={styles.focus}>
-          <span className={styles.label}>{focus.label}</span>
-          <span className={styles.description} title={focus.description}>
-            {focus.description}
-          </span>
-          <button
-            type="button"
-            className={styles.clear}
-            onClick={onClearFocus}
-            title="Show every change again (Escape)"
-            aria-label="Clear focus"
-          >
-            <X size={12} aria-hidden="true" />
-          </button>
-        </span>
-      )}
+export function NoteStatus({ summary }: Props) {
+  if (isComplete(summary)) return null;
 
-      {!isComplete(summary) && (
-        <span className={styles.warning} title={explain(summary)}>
-          <MessageSquareDashed size={13} aria-hidden="true" />
-          {summary.matched} / {summary.total}
-        </span>
-      )}
-    </div>
+  return (
+    <span className={styles.warning} title={explain(summary)}>
+      <MessageSquareDashed size={13} aria-hidden="true" />
+      {summary.matched} / {summary.total}
+    </span>
   );
 }
 

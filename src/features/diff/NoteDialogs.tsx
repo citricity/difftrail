@@ -1,5 +1,5 @@
 /**
- * The two dialogs the gutter markers open.
+ * The dialogs the gutter markers and the change bar open.
  *
  * Native `<dialog>`, as Settings and the file navigator are: `showModal` gives
  * the focus trap, the backdrop, the inert background and Escape for nothing,
@@ -8,14 +8,22 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CornerDownRight, Crosshair, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import type { AiChangelogView } from '../../hooks/useAiChangelog.ts';
-import { fileOfHunk, hunksOfChange } from '../../lib/noteMarkers.ts';
+import {
+  changesInOrder,
+  fileOfHunk,
+  hunksOfChange,
+  laneColour,
+  ungroupedHunks,
+} from '../../lib/noteMarkers.ts';
 import styles from './NoteDialogs.module.css';
 
 /** What the reader has open, if anything. */
 export type NoteDialog =
   | { kind: 'hunk'; hunkId: string }
   | { kind: 'change'; changeId: string }
+  | { kind: 'contents' }
   | null;
 
 interface Props {
@@ -31,6 +39,8 @@ interface Props {
   focused?: string | null;
   onFocus?: (changeId: string) => void;
   onClearFocus?: () => void;
+  /** The change the reader is in, marked in the contents list. */
+  currentChange?: string | null;
 }
 
 export function NoteDialogs({
@@ -43,6 +53,7 @@ export function NoteDialogs({
   focused = null,
   onFocus,
   onClearFocus,
+  currentChange = null,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -76,6 +87,20 @@ export function NoteDialogs({
           notes={notes}
           onClose={onClose}
           onOpenChange={onOpenChange}
+        />
+      )}
+
+      {open?.kind === 'contents' && (
+        <ContentsDialog
+          notes={notes}
+          order={order}
+          current={currentChange}
+          focused={focused}
+          onClose={onClose}
+          onGoTo={(changeId) => {
+            onOpenChange(changeId);
+          }}
+          onFocus={onFocus}
         />
       )}
 
@@ -184,6 +209,97 @@ function HunkDialog({
             </>
           )}
         </section>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Every logical change in the diff, in the order they appear.
+ *
+ * Stepping is how a reader walks a diff; this is how they see its shape before
+ * they start — "this branch is five intents" is a sentence the arrows alone can
+ * never say, because you only learn the shape by walking all of it.
+ */
+function ContentsDialog({
+  notes,
+  order,
+  current,
+  focused,
+  onClose,
+  onGoTo,
+  onFocus,
+}: {
+  notes: AiChangelogView;
+  order: readonly string[];
+  current: string | null;
+  focused: string | null;
+  onClose: () => void;
+  onGoTo: (changeId: string) => void;
+  onFocus?: (changeId: string) => void;
+}) {
+  const hunks = notes.changelog?.hunks ?? {};
+  const changes = changesInOrder(order, hunks);
+  const ungrouped = ungroupedHunks(order, hunks);
+
+  return (
+    <>
+      <Header title="Logical changes" onClose={onClose} />
+
+      <div className={styles.body}>
+        <ol className={styles.contents}>
+          {changes.map(({ id }) => {
+            const label = notes.labelOf(id);
+            const covered = hunksOfChange(order, hunks, id).length;
+
+            return (
+              <li key={id} className={styles.entry}>
+                <button
+                  type="button"
+                  className={styles.entryButton}
+                  aria-current={id === current ? 'true' : undefined}
+                  onClick={() => onGoTo(id)}
+                >
+                  <span
+                    className={styles.entryLabel}
+                    style={{ '--note-lane': laneColour(label) } as CSSProperties}
+                  >
+                    {label}
+                  </span>
+                  <span className={styles.entryText}>
+                    {notes.describe(id)}
+                    <span className={styles.entryMeta}>
+                      {covered} hunk{covered === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                </button>
+
+                {onFocus !== undefined && (
+                  <button
+                    type="button"
+                    className={`${styles.entryFocus} ${
+                      id === focused ? styles.entryFocusOn : ''
+                    }`}
+                    aria-pressed={id === focused}
+                    title="Step through this change only"
+                    aria-label={`Focus logical change ${label}`}
+                    onClick={() => onFocus(id)}
+                  >
+                    <Crosshair size={13} aria-hidden="true" />
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+
+        {ungrouped > 0 && (
+          <p className={styles.muted}>
+            {ungrouped} hunk{ungrouped === 1 ? '' : 's'} belong
+            {ungrouped === 1 ? 's' : ''} to no logical change. The arrows step
+            past {ungrouped === 1 ? 'it' : 'them'}.
+          </p>
+        )}
       </div>
     </>
   );

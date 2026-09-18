@@ -8,7 +8,7 @@
  * hunks here, so its markers appear when it does.
  */
 
-import type { NavigationFilter } from './navigation.ts';
+import type { Direction, NavigationFilter } from './navigation.ts';
 import type { ResolvedHunk } from '../types/index.ts';
 
 export interface HunkMarkers {
@@ -116,4 +116,166 @@ export function focusFilter(
     hunk: (hunkId) => focused.has(hunkId),
     file: (fileId) => files.has(fileId),
   };
+}
+
+/**
+ * Every hunk the changelog knows, in the order the document shows them.
+ *
+ * Built from the file list rather than from the diffs, so a file whose diff
+ * has not been read yet still contributes its hunks: the counter and the
+ * contents list would otherwise grow under the reader as files load, and a
+ * total that moves while you are reading it is worse than no total.
+ */
+export function documentOrder(
+  fileOrder: readonly string[],
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+): string[] {
+  const at = new Map(fileOrder.map((fileId, index) => [fileId, index]));
+  const position = (hunkId: string): number =>
+    Number(hunkId.slice(hunkId.lastIndexOf(':') + 1));
+
+  return Object.keys(hunks)
+    .filter((hunkId) => at.has(fileOfHunk(hunkId)))
+    .sort((left, right) => {
+      const file =
+        (at.get(fileOfHunk(left)) ?? 0) - (at.get(fileOfHunk(right)) ?? 0);
+      return file !== 0 ? file : position(left) - position(right);
+    });
+}
+
+/**
+ * One logical change, as the document sees it.
+ *
+ * `hunkId` is the first hunk the change covers here, which is where stepping
+ * to it lands and where its badge is drawn filled.
+ */
+export interface ChangeEntry {
+  id: string;
+  hunkId: string;
+}
+
+/**
+ * Every logical change with a hunk on screen, in first-appearance order.
+ *
+ * First appearance rather than the order of the changelog's table, because the
+ * bar and the contents list are about reading the diff top to bottom, and a
+ * table written in any other order would send the reader backwards.
+ */
+export function changesInOrder(
+  order: readonly string[],
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+): ChangeEntry[] {
+  const first = new Map<string, string>();
+
+  for (const hunkId of order) {
+    for (const change of hunks[hunkId]?.logicalChangeIds ?? []) {
+      if (!first.has(change)) first.set(change, hunkId);
+    }
+  }
+
+  return [...first].map(([id, hunkId]) => ({ id, hunkId }));
+}
+
+/**
+ * The logical change a hunk reads as belonging to.
+ *
+ * A hunk may serve more than one intent; the first is the one the bar names,
+ * and the rest are a click away in the hunk's own dialog.
+ */
+export function changeOfHunk(
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+  hunkId: string | null,
+): string | null {
+  if (hunkId === null) return null;
+  return hunks[hunkId]?.logicalChangeIds[0] ?? null;
+}
+
+/**
+ * The change to step to, or null at the ends.
+ *
+ * Stepping moves change by change rather than span by span: a change that
+ * re-opens later is one entry, so the arrows, the counter and the contents
+ * list all tell the same story. Its later hunks are reached by stepping hunks,
+ * or by focusing it.
+ *
+ * From a hunk no change covers — an older changelog, where coverage was not
+ * required — there is no current change to move from, so the nearest one in
+ * the direction of travel is the answer rather than nothing at all.
+ */
+export function stepChange(
+  changes: readonly ChangeEntry[],
+  order: readonly string[],
+  currentHunkId: string | null,
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+  direction: Direction,
+): ChangeEntry | null {
+  if (changes.length === 0) return null;
+
+  // Nowhere yet: Next enters at the top of the document and Previous at the
+  // bottom, which is what the hunk arrows do from the same state.
+  if (currentHunkId === null) {
+    return (direction === 'next' ? changes[0] : changes[changes.length - 1]) ?? null;
+  }
+
+  const current = changeOfHunk(hunks, currentHunkId);
+  const at = current === null ? -1 : changes.findIndex((entry) => entry.id === current);
+
+  if (at !== -1) {
+    return changes[direction === 'next' ? at + 1 : at - 1] ?? null;
+  }
+
+  const position = order.indexOf(currentHunkId);
+  const positionOf = (entry: ChangeEntry) => order.indexOf(entry.hunkId);
+
+  return direction === 'next'
+    ? (changes.find((entry) => positionOf(entry) > position) ?? null)
+    : ([...changes].reverse().find((entry) => positionOf(entry) < position) ?? null);
+}
+
+/**
+ * Hunks the changelog knows about but places in no logical change.
+ *
+ * Under the current authoring rules there should be none; an older changelog,
+ * written before coverage was asked for, will have some, and the contents list
+ * says so rather than leaving the reader to wonder what is missing.
+ */
+export function ungroupedHunks(
+  order: readonly string[],
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+): number {
+  return order.filter((id) => hunks[id]?.logicalChangeIds.length === 0).length;
+}
+
+/**
+ * A, B … Z, AA, AB … — spreadsheet columns.
+ *
+ * Bijective base 26, so the labels never run out. Wrapping at 26 would give
+ * two changes the same badge and the same colour, with nothing to tell them
+ * apart in the gutter.
+ */
+export function changeLabel(index: number): string {
+  let label = '';
+  for (let n = index; n >= 0; n = Math.floor(n / 26) - 1) {
+    label = String.fromCharCode(65 + (n % 26)) + label;
+  }
+  return label;
+}
+
+/** A label back to the position it was made from. */
+export function laneOfLabel(label: string): number {
+  let index = 0;
+  for (const character of label) {
+    index = index * 26 + (character.charCodeAt(0) - 64);
+  }
+  return index - 1;
+}
+
+/**
+ * A lane colour from the change's label, rather than from the order the UI
+ * happened to draw things in. Past six they repeat, and the label is what
+ * identifies a change.
+ */
+export function laneColour(label: string): string {
+  const index = laneOfLabel(label);
+  return `var(--note-lane-${((index % 6) + 6) % 6})`;
 }

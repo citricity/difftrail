@@ -1,0 +1,163 @@
+/* Subordinate to the toolbar on purpose: page background rather than the
+   toolbar's surface, a hairline under it, and nothing in it larger than the
+   rest of the chrome. It belongs to the document below, not to the bar above. */
+/* Narrowed to one change: the tint says so across the whole row, because a
+   mode that only shows in one small pressed button is a mode readers forget
+   they are in. */
+.barFocused {
+  background: var(--accent-soft);
+  border-bottom-color: var(--accent);
+}
+
+.bar {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  height: 26px;
+  /* The badge lines up with the notes column in the gutter below, so the eye
+     connects the bar to the markers it names. */
+  padding: 0 10px 0 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg);
+  font-family: var(--font-ui);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+/* The badge and its affordance: this is what opens the contents list. */
+.contents {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: center;
+  height: 20px;
+  padding: 0 4px 0 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.contents:hover {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+}
+
+/* The same mark as the gutter's start badge, at the same size, so a reader
+   learns one symbol rather than two. */
+.mark {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 2px;
+  border: 1px solid var(--note-lane);
+  border-radius: var(--radius-sm);
+  background: var(--note-lane);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* No change covers the hunk in view — an older changelog, written before
+   coverage was asked for. Drawn as an absence rather than as a fault. */
+.empty {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.description {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.muted {
+  color: var(--text-faint);
+}
+
+.position {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: calc(var(--ui-font-size) - 2px);
+  font-variant-numeric: tabular-nums;
+}
+
+.group {
+  display: flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  cursor: default;
+}
+
+.button + .button {
+  border-left: 1px solid var(--border);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.button:disabled {
+  color: var(--text-faint);
+}
+
+.focus {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.focus:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.focus:disabled {
+  color: var(--text-faint);
+}
+
+/* Pressed, not hovered: the reader needs to see the narrowing is still on
+   when the pointer is elsewhere. */
+.focusOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.focusOn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

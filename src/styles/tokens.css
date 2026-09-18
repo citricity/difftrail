@@ -36,8 +36,8 @@
      back out of the computed style to work out where auto wrapping may break a
      line, and a calc() would come back to it as text. */
   --notes-width: 0px;
-  --notes-lane: 24px;
-  --gutter-width-with-notes: 152px;
+  --notes-lane: 34px;
+  --gutter-width-with-notes: 162px;
   /* Clear space after the code on each line. Also read by auto wrapping,
      which fits the code into what is left of the line after the gutter and
      this. */
@@ -181,6 +181,6 @@
    markers — and, because `useRowMetrics` reads --gutter-width from the root, so
    that auto wrapping knows the code has less room than it did. */
 :root[data-ai-changelog] {
-  --notes-width: 44px;
+  --notes-width: 54px;
   --gutter-width: var(--gutter-width-with-notes);
 }

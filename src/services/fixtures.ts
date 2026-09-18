@@ -332,7 +332,8 @@ const AI_CHANGELOG: AiChangelog = {
     },
     {
       id: '1',
-      description: 'Warm the diff colours slightly for dark mode.',
+      description:
+        'Keep the reader where they were when the row model is rebuilt.',
       associatedIssues: [],
     },
   ],
@@ -351,7 +352,7 @@ const AI_CHANGELOG: AiChangelog = {
       reasons: [
         'Keeps the reader in place: the scroll position is anchored to a row key, not to a pixel offset that the rebuild invalidates.',
       ],
-      logicalChangeIds: ['0'],
+      logicalChangeIds: ['0', '1'],
       ambiguous: false,
       partial: true,
     },
