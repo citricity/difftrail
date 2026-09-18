@@ -13,6 +13,7 @@
 
 import { AppError } from '../types/index.ts';
 import type {
+  AiChangelog,
   ChangedFile,
   DiffHunk,
   DiffLine,
@@ -306,7 +307,77 @@ const REPOSITORY: RepositoryInfo = {
 let settings: Settings = { ...DEFAULT_SETTINGS };
 
 const SAMPLE_BINARY = '/Applications/Diff Trek.app/Contents/MacOS/diff-trek';
-const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" "$@" >/dev/null 2>&1 & }; f`;
+const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; case "$1" in -*) "${SAMPLE_BINARY}" "$root" "$@";; *) "${SAMPLE_BINARY}" "$root" "$@" >/dev/null 2>&1 & ;; esac; }; f`;
+
+/**
+ * A sample AI changelog over the sample diff.
+ *
+ * Deliberately not tidy, because every state the UI has to draw should be
+ * visible in the browser without arranging a repository: one logical change
+ * spanning two files, a hunk explained on its own, a hunk nobody explained, one
+ * whose hunk has grown around its note since, and two hunks the notes no longer
+ * know about at all.
+ */
+const AI_CHANGELOG: AiChangelog = {
+  nonce: 'AB99X7',
+  author: 'claude',
+  issueTracker: 'https://github.com/citricity/difftrek/issues',
+  commithash: null,
+  logicalChanges: [
+    {
+      id: '0',
+      description:
+        'Reveal a change by the row model rather than by measuring the DOM, so navigation works before a row has ever been rendered.',
+      associatedIssues: ['2'],
+    },
+    {
+      id: '1',
+      description: 'Warm the diff colours slightly for dark mode.',
+      associatedIssues: [],
+    },
+  ],
+  hunks: {
+    'src/features/diff/DiffDocument.tsx:hunk:0': {
+      hunkId: 'src/features/diff/DiffDocument.tsx:hunk:0',
+      reasons: [
+        'The reveal has to know the row offset before paint, and only the model knows it — reading it from the DOM meant a row that was not rendered yet could not be scrolled to.',
+      ],
+      logicalChangeIds: ['0'],
+      ambiguous: false,
+      partial: false,
+    },
+    'src/features/diff/DiffDocument.tsx:hunk:1': {
+      hunkId: 'src/features/diff/DiffDocument.tsx:hunk:1',
+      reasons: [
+        'Keeps the reader in place: the scroll position is anchored to a row key, not to a pixel offset that the rebuild invalidates.',
+      ],
+      logicalChangeIds: ['0'],
+      ambiguous: false,
+      partial: true,
+    },
+    'src/lib/navigation.ts:hunk:0': {
+      hunkId: 'src/lib/navigation.ts:hunk:0',
+      reasons: [],
+      logicalChangeIds: ['0'],
+      ambiguous: false,
+      partial: false,
+    },
+    'src/styles/tokens.css:hunk:0': {
+      hunkId: 'src/styles/tokens.css:hunk:0',
+      reasons: [],
+      logicalChangeIds: [],
+      ambiguous: false,
+      partial: false,
+    },
+  },
+  summary: {
+    matched: 4,
+    total: 5,
+    unexplained: 1,
+    partial: 1,
+    staleNotes: 1,
+  },
+};
 
 /** The `git dt` alias, as far as the browser preview is concerned. */
 let gitAlias: GitAliasStatus = {
@@ -377,6 +448,9 @@ async function resolveFixture(
 
     // Outside Tauri there is no Git configuration to change, so these pretend,
     // and remember the pretence until reload like settings do.
+    case 'get_ai_changelog':
+      return delay(AI_CHANGELOG);
+
     case 'get_git_alias_status':
       return delay(gitAlias);
 

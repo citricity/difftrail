@@ -33,6 +33,76 @@ pub(crate) fn options_from(mut args: impl Iterator<Item = String>) -> LaunchOpti
     }
 }
 
+/// Write an AI changelog for the current diff instead of opening a window.
+const CREATE_CHANGELOG_FLAG: &str = "--createchangelog";
+
+/// Work Diff Trek was asked to do on the command line, with no window involved.
+///
+/// The `git dt` alias runs the executable in the foreground, unredirected,
+/// whenever its first argument begins with `-`, so these can answer on the
+/// terminal that asked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CliRequest {
+    /// `git dt --createchangelog="claude"`. The value names whoever is about to
+    /// write the notes, which the UI shows so a reader knows whose account of
+    /// the change they are reading.
+    CreateChangelog { author: String },
+}
+
+pub fn cli_request() -> Option<CliRequest> {
+    cli_request_from(std::env::args().skip(1))
+}
+
+pub(crate) fn cli_request_from(args: impl Iterator<Item = String>) -> Option<CliRequest> {
+    request_from(&mut args.peekable())
+}
+
+/// Split out so a test can see what was left in the iterator: the point of
+/// peeking is that a flag we decide not to use is still there afterwards.
+fn request_from<I: Iterator<Item = String>>(
+    args: &mut std::iter::Peekable<I>,
+) -> Option<CliRequest> {
+    while let Some(arg) = args.next() {
+        let Some(rest) = arg.strip_prefix(CREATE_CHANGELOG_FLAG) else {
+            continue;
+        };
+
+        let author = match rest.chars().next() {
+            // `--createchangelog=claude`
+            Some('=') => rest[1..].to_string(),
+            // `--createchangelog claude`. Peeked rather than taken, so a
+            // following flag is left where it is: `--createchangelog --example`
+            // has no author *and* still has its `--example`.
+            None => match args.peek() {
+                Some(next) if !next.starts_with('-') => args.next().unwrap_or_default(),
+                _ => String::new(),
+            },
+            // `--createchangelogs`, which is a different flag entirely.
+            Some(_) => continue,
+        };
+
+        return Some(CliRequest::CreateChangelog {
+            author: unquote(author.trim()),
+        });
+    }
+
+    None
+}
+
+/// Strips one layer of matching quotes.
+///
+/// A shell removes them, but the flag is written `--createchangelog="claude"`
+/// in every instruction, and it also arrives from places that do not: a Git
+/// alias expansion, a Windows shell, an agent building an argument list itself.
+fn unquote(value: &str) -> String {
+    for quote in ['"', '\''] {
+        if let Some(inner) = value.strip_prefix(quote).and_then(|v| v.strip_suffix(quote)) {
+            return inner.to_string();
+        }
+    }
+    value.to_string()
+}
+
 /// What to open: a repository, and optionally a commit or range within it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LaunchTarget {
@@ -180,6 +250,84 @@ mod tests {
         assert!(options_from(args(&["--example"])).example);
         assert!(options_from(args(&["/repos/alpha", "--example"])).example);
         assert!(options_from(args(&["--example", "/repos/alpha"])).example);
+    }
+
+    #[test]
+    fn a_changelog_request_carries_whoever_is_writing_it() {
+        assert_eq!(
+            cli_request_from(args(&["/repos/alpha", "--createchangelog=claude"])),
+            Some(CliRequest::CreateChangelog {
+                author: "claude".into()
+            })
+        );
+
+        assert_eq!(
+            cli_request_from(args(&["--createchangelog", "copilot"])),
+            Some(CliRequest::CreateChangelog {
+                author: "copilot".into()
+            })
+        );
+
+        assert_eq!(
+            cli_request_from(args(&["--createchangelog=\"my agent\""])),
+            Some(CliRequest::CreateChangelog {
+                author: "my agent".into()
+            })
+        );
+    }
+
+    #[test]
+    fn a_changelog_request_without_a_name_is_still_a_request() {
+        // The runner says what is missing; silently opening a window instead
+        // would leave an agent waiting for a path that never comes.
+        assert_eq!(
+            cli_request_from(args(&["--createchangelog"])),
+            Some(CliRequest::CreateChangelog {
+                author: String::new()
+            })
+        );
+
+        assert_eq!(
+            cli_request_from(args(&["--createchangelog", "--example"])),
+            Some(CliRequest::CreateChangelog {
+                author: String::new()
+            })
+        );
+    }
+
+    #[test]
+    fn a_flag_after_the_option_is_left_for_whoever_parses_it() {
+        // `--createchangelog` takes the next argument as the author only when
+        // it is not itself a flag — and does not swallow it either way.
+        let mut args = args(&["--createchangelog", "--example", "/repos/alpha"]).peekable();
+        let request = request_from(&mut args);
+
+        assert_eq!(
+            request,
+            Some(CliRequest::CreateChangelog {
+                author: String::new()
+            })
+        );
+        assert_eq!(
+            args.collect::<Vec<_>>(),
+            ["--example".to_string(), "/repos/alpha".to_string()]
+        );
+    }
+
+    #[test]
+    fn an_author_that_is_not_a_flag_is_taken() {
+        let mut args = args(&["--createchangelog", "copilot", "main...HEAD"]).peekable();
+        request_from(&mut args);
+
+        assert_eq!(args.collect::<Vec<_>>(), ["main...HEAD".to_string()]);
+    }
+
+    #[test]
+    fn ordinary_launches_are_not_changelog_requests() {
+        assert_eq!(cli_request_from(args(&[])), None);
+        assert_eq!(cli_request_from(args(&["/repos/alpha", "main...HEAD"])), None);
+        assert_eq!(cli_request_from(args(&["--example"])), None);
+        assert_eq!(cli_request_from(args(&["--createchangelogs=claude"])), None);
     }
 
     #[test]

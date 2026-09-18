@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { AppError } from '../types/index.ts';
 import type {
+  AiChangelog,
   ChangedFile,
   FileDiff,
   FileSide,
@@ -146,6 +147,18 @@ async function callNative<T>(command: string): Promise<T> {
     console.error(`[difftrek] ${command} failed`, error.detail ?? error.message);
     throw error;
   }
+}
+
+/**
+ * The AI changelog describing what is on screen, or `null` when there is none.
+ *
+ * Null is the ordinary case, not an error: most diffs have no changelog. One
+ * that only partly matches is still returned — a developer editing the code
+ * after the notes were written is normal — with a summary of how much of it
+ * still applies.
+ */
+export function getAiChangelog(): Promise<AiChangelog | null> {
+  return call<AiChangelog | null>('get_ai_changelog');
 }
 
 /** What installing `git dt` would do, without doing it. */

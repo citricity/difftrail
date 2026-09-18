@@ -969,3 +969,18 @@ When making implementation decisions, optimise in roughly this order:
 Avoid adding functionality simply because typical Git GUI applications contain it.
 
 The narrowness of **Diff Trek** is intentional.
+
+## AI change log
+
+When you have finished a piece of work, record why you made each change.
+
+1. Run `git dt --createchangelog="claude"` (use your own name if you are a
+   different agent). It prints the path of a changelog file, and instructions.
+   If you can't run git dt because you are in a sandboxed environment, curl -fsSL https://citricity.github.io/difftrek/difftrek-changelog.sh -o difftrek-changelog.sh
+   and then run difftrek-changelog.sh directly.
+2. That file is the diff with a placeholder after every hunk. Fill each one in
+   with **why** that hunk exists — not what it does, the diff already shows that.
+3. Where several hunks serve one intent, wrap them in a LOGICAL_CHANGE span and
+   describe it in the LOGICAL_CHANGE_TABLE block.
+4. Edit only inside the tag blocks. Never retype or reformat the diff itself:
+   one altered space unmatches a hunk and loses its note.

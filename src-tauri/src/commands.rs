@@ -4,6 +4,7 @@
 //! state, call into `git`, return domain types. No presentation logic here,
 //! and no Git logic in the frontend.
 
+use crate::ai_changelog::service::{self as changelog, ChangelogView};
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::git::model::{ChangedFile, FileDiff, RepositoryInfo};
 use crate::git_alias::{self, AliasStatus, ConfigTarget};
@@ -72,6 +73,19 @@ pub fn get_repository_info(state: State<'_, AppState>) -> AppResult<RepositoryIn
 
     state.set_root(root.clone(), comparison);
     repository::info(&root, info)
+}
+
+/// The AI changelog describing what is on screen, if there is one.
+///
+/// `None` is the ordinary case and not an error: most diffs have no changelog,
+/// and one that no longer describes this comparison at all is the same as none.
+/// A changelog that only partly matches *is* returned, with a summary saying
+/// how much of it still applies — a developer editing the code after the notes
+/// were written is normal, and losing every note over it would not be.
+#[tauri::command]
+pub fn get_ai_changelog(state: State<'_, AppState>) -> AppResult<Option<ChangelogView>> {
+    let root = state.root()?;
+    Ok(changelog::load(&root, &state.comparison()).map(ChangelogView::from))
 }
 
 #[tauri::command]
