@@ -35,10 +35,6 @@ interface BadgesProps {
   continuesAbove?: readonly string[];
   /** Of those, the ones that also cover hunks further down. */
   continuesBelow?: readonly string[];
-  /** Changes whose run reaches further down than this row. */
-  runEndBelow?: readonly string[];
-  /** Changes whose run began further up than this row. */
-  runStartAbove?: readonly string[];
   labelOf: (change: string) => string;
   describe: (change: string) => string;
   onOpen: (change: string) => void;
@@ -65,8 +61,6 @@ function LogicalBadgesImpl({
   ends,
   continuesAbove = [],
   continuesBelow = [],
-  runEndBelow = [],
-  runStartAbove = [],
   labelOf,
   describe,
   onOpen,
@@ -92,18 +86,17 @@ function LogicalBadgesImpl({
         // change: from a run's start, up leaves for the run before and down
         // goes to the far end of this one; from its end, up goes back to where
         // it began and down leaves for the run after.
+        // Within the block, the far end is always somewhere to go: a run has a
+        // top and a bottom whether it is one long hunk or six short ones.
+        // Beyond it, only where the change opens again.
         const up: RunJump | null = starting
           ? continuesAbove.includes(change)
             ? 'previousRun'
             : null
-          : runStartAbove.includes(change)
-            ? 'runStart'
-            : null;
+          : 'runStart';
 
         const down: RunJump | null = starting
-          ? runEndBelow.includes(change)
-            ? 'runEnd'
-            : null
+          ? 'runEnd'
           : continuesBelow.includes(change)
             ? 'nextRun'
             : null;

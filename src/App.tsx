@@ -20,6 +20,7 @@ import { GitAliasDialog } from './features/gitAlias/GitAliasDialog.tsx';
 import { NotARepository } from './features/gitAlias/NotARepository.tsx';
 import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
+import type { RevealEdge } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
 import { useAiChangelog } from './hooks/useAiChangelog.ts';
 import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
@@ -185,8 +186,8 @@ export function App() {
    * lands at once and the hunk follows when its diff arrives.
    */
   const revealHunk = useCallback(
-    (hunkId: string) => {
-      navigation.goToHunk(fileOfHunk(hunkId), hunkId);
+    (hunkId: string, edge: RevealEdge = 'start') => {
+      navigation.goToHunk(fileOfHunk(hunkId), hunkId, edge);
     },
     [navigation],
   );
@@ -271,7 +272,9 @@ export function App() {
         );
         if (target === null) return;
 
-        revealHunk(target);
+        // Only the far end of the block wants the bottom of what it lands on;
+        // everything else is somewhere the reader is about to start reading.
+        revealHunk(target, kind === 'runEnd' ? 'end' : 'start');
         setRequestedChange(changeId);
       },
     };
@@ -420,6 +423,7 @@ export function App() {
         }
         current={navigation.current}
         revealRequest={navigation.revealRequest}
+        revealEdge={navigation.revealEdge}
         onSelect={navigation.goTo}
         onScrollToChange={navigation.goTo}
         onSelectFile={navigation.goToFile}

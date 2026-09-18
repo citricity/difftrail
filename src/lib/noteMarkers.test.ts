@@ -343,32 +343,6 @@ describe('a change that opens more than once', () => {
     expect(markers.c.continuesBelow).toEqual([]);
   });
 
-  it('says how far the run under the marker itself reaches', () => {
-    const markers = markersFor(['a', 'b', 'c'], { a: ['0'], b: ['0'], c: [] });
-
-    expect(markers.a.runEndBelow).toEqual(['0']);
-    expect(markers.a.runStartAbove).toEqual([]);
-    expect(markers.b.runStartAbove).toEqual(['0']);
-    expect(markers.b.runEndBelow).toEqual([]);
-  });
-
-  it('offers no far end when the run is a single hunk', () => {
-    const markers = markersFor(['a'], { a: ['0'] });
-
-    expect(markers.a.runEndBelow).toEqual([]);
-    expect(markers.a.runStartAbove).toEqual([]);
-  });
-
-  it('says nothing about a change with only one run', () => {
-    const markers = markersFor(['a', 'b'], { a: ['0'], b: ['0'] });
-
-    expect(markers.a.continuesBelow).toEqual([]);
-    expect(markers.b.continuesAbove).toEqual([]);
-  });
-
-  // The run ends on screen only because the next file has not been read yet.
-  // Judged by the rendered rows alone, the marker would tell the reader there
-  // is nothing further to see.
   it('counts hunks in files the document has not loaded', () => {
     const markers = markersFor(['a'], { a: ['0'], z: ['0'] }, ['a', 'z']);
 
@@ -406,11 +380,12 @@ describe('jumpTarget', () => {
     expect(to('d', 'runStart')).toBe('c');
   });
 
-  // An arrow that went nowhere would be worse than no arrow at all, so a run
-  // of one hunk has no far end to offer.
-  it('has no far end to offer on a run of one hunk', () => {
-    expect(to('a', 'runEnd')).toBeNull();
-    expect(to('a', 'runStart')).toBeNull();
+  // A block has a top and a bottom however few hunks it is made of - one long
+  // hunk is still tens of lines - so the far end is the same hunk, and which
+  // edge of it to show is the reveal's business rather than this one's.
+  it('answers with the same hunk on a run of one', () => {
+    expect(to('a', 'runEnd')).toBe('a');
+    expect(to('a', 'runStart')).toBe('a');
   });
 
   it('has nowhere to go at either end of the document', () => {

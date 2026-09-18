@@ -22,10 +22,6 @@ export interface HunkMarkers {
   continuesAbove: string[];
   /** Changes marked here that also cover a hunk further down. */
   continuesBelow: string[];
-  /** Changes whose run ends further down than the hunk marked here. */
-  runEndBelow: string[];
-  /** Changes whose run began further up than the hunk marked here. */
-  runStartAbove: string[];
 }
 
 const NONE: HunkMarkers = {
@@ -34,8 +30,6 @@ const NONE: HunkMarkers = {
   inside: [],
   continuesAbove: [],
   continuesBelow: [],
-  runEndBelow: [],
-  runStartAbove: [],
 };
 
 export function noMarkers(): HunkMarkers {
@@ -87,8 +81,6 @@ export function buildNoteMarkers(
     const inside: string[] = [];
     const continuesAbove: string[] = [];
     const continuesBelow: string[] = [];
-    const runEndBelow: string[] = [];
-    const runStartAbove: string[] = [];
 
     const here = rank.get(id);
 
@@ -103,36 +95,17 @@ export function buildNoteMarkers(
       if (here === undefined) continue;
       const elsewhere = reach.get(change) ?? [];
       // A run that ends here only because the next file has not loaded is
-      // still a change with more to show, so both questions are asked of the
-      // whole diff rather than of the rows on screen.
-      const runs = runsOf(fullOrder, hunks, change);
-      const run = runs.find((covered) => covered.includes(id)) ?? [];
-      const runFirst = run[0];
-      const runLast = run[run.length - 1];
-
+      // still a change with more to show, so this is asked of the whole diff
+      // rather than of the rows on screen.
       if (first && elsewhere.some((position) => position < here)) {
         continuesAbove.push(change);
       }
       if (last && elsewhere.some((position) => position > here)) {
         continuesBelow.push(change);
       }
-      if (first && runLast !== undefined && runLast !== id) {
-        runEndBelow.push(change);
-      }
-      if (last && runFirst !== undefined && runFirst !== id) {
-        runStartAbove.push(change);
-      }
     }
 
-    markers.set(id, {
-      starts,
-      ends,
-      inside,
-      continuesAbove,
-      continuesBelow,
-      runEndBelow,
-      runStartAbove,
-    });
+    markers.set(id, { starts, ends, inside, continuesAbove, continuesBelow });
   });
 
   return markers;
@@ -177,9 +150,10 @@ function runsOf(
  * Where one of a marker's arrows leads, or null when it leads nowhere.
  *
  * A jump to another run lands on that run's first hunk, which is where a
- * reader would start reading it. A jump within a run lands on the hunk at the
- * far end, and answers nothing when the run is one hunk long — there is no
- * other end to go to, and an arrow that did nothing would be worse than none.
+ * reader would start reading it. A jump within a run lands on the hunk at its
+ * far end — the same hunk, when the run is one hunk long, because a block has
+ * a top and a bottom however few hunks it is made of, and it is the caller's
+ * reveal that decides which edge of that hunk to show.
  */
 export function jumpTarget(
   order: readonly string[],
@@ -199,14 +173,10 @@ export function jumpTarget(
       return runs[at - 1]?.[0] ?? null;
     case 'nextRun':
       return runs[at + 1]?.[0] ?? null;
-    case 'runStart': {
-      const first = run[0] ?? null;
-      return first === fromHunkId ? null : first;
-    }
-    case 'runEnd': {
-      const last = run[run.length - 1] ?? null;
-      return last === fromHunkId ? null : last;
-    }
+    case 'runStart':
+      return run[0] ?? null;
+    case 'runEnd':
+      return run[run.length - 1] ?? null;
   }
 }
 

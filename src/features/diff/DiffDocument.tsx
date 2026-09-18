@@ -25,6 +25,7 @@ import {
   endOfDocumentHeight,
   lineAreaWidth,
   offsetOfAnchor,
+  offsetOfHunkEnd,
   offsetOfTarget,
   rowAtOffset,
   rowKey,
@@ -61,6 +62,7 @@ import { HunkNoteIcon, LogicalBadges } from './NoteMarkers.tsx';
 import { buildNoteMarkers } from '../../lib/noteMarkers.ts';
 import type { HunkMarkers } from '../../lib/noteMarkers.ts';
 import type { DocumentNotes } from '../../hooks/useAiChangelog.ts';
+import type { RevealEdge } from '../../hooks/useDiffNavigation.ts';
 import { ImageRow } from './ImageRow.tsx';
 import { NoticeRow } from './NoticeRow.tsx';
 import styles from './DiffDocument.module.css';
@@ -87,6 +89,12 @@ interface Props {
    * changed — see `DiffNavigation.revealRequest`.
    */
   revealRequest: number;
+  /**
+   * Which end of the current change to bring into view. The marker at the end
+   * of a logical change's run asks for `end`; everything else wants the top of
+   * what it landed on.
+   */
+  revealEdge?: RevealEdge;
   onSelect: (location: ChangeLocation) => void;
   /**
    * Told when the reader scrolls onto a different change, so the position
@@ -130,6 +138,7 @@ export function DiffDocument({
   comparison,
   current,
   revealRequest,
+  revealEdge = 'start',
   onSelect,
   onScrollToChange,
   onSelectFile,
@@ -243,8 +252,6 @@ export function DiffDocument({
         ends={ends}
         continuesAbove={marks.continuesAbove}
         continuesBelow={marks.continuesBelow}
-        runEndBelow={marks.runEndBelow}
-        runStartAbove={marks.runStartAbove}
         labelOf={notes.labelOf}
         describe={notes.describe}
         onOpen={notes.onOpenChange}
@@ -364,7 +371,16 @@ export function DiffDocument({
     const key = `${current.fileId}|${current.hunkId ?? ''}|${revealRequest}`;
     if (lastRevealed.current === key) return;
 
-    const offset = offsetOfTarget(model, current.fileId, current.hunkId);
+    // The far edge of a hunk, when a marker asked to be taken to the bottom of
+    // its block: the row is brought to the foot of the viewport rather than
+    // the top, which is where the reader is looking for it.
+    const end =
+      revealEdge === 'end' && current.hunkId !== null
+        ? offsetOfHunkEnd(model, current.hunkId)
+        : null;
+
+    const offset =
+      end ?? offsetOfTarget(model, current.fileId, current.hunkId);
     if (offset === null) return;
 
     lastRevealed.current = key;
@@ -375,14 +391,18 @@ export function DiffDocument({
     // Clear the sticky file header as well, or the change lands underneath it.
     assignScrollTop(
       element,
-      Math.max(0, offset - metrics.fileHeaderHeight - SCROLL_MARGIN),
+      end === null
+        ? Math.max(0, offset - metrics.fileHeaderHeight - SCROLL_MARGIN)
+        : Math.max(0, offset - viewportHeight + SCROLL_MARGIN),
     );
   }, [
     current,
     model,
     metrics.fileHeaderHeight,
     revealRequest,
+    revealEdge,
     viewport,
+    viewportHeight,
     assignScrollTop,
   ]);
 
