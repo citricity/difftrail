@@ -1,3 +1,5 @@
+pub mod ai_changelog;
+pub mod cli;
 pub mod commands;
 pub mod error;
 pub mod git;
@@ -12,6 +14,13 @@ use tauri::Emitter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A command-line request is answered here and the process ends, before
+    // Tauri has a chance to put a window on screen. `git dt --createchangelog`
+    // is something an agent runs in a terminal; a window would be in the way.
+    if let Some(request) = launch::cli_request() {
+        std::process::exit(cli::execute(request));
+    }
+
     tauri::Builder::default()
         .manage(AppState::default())
         // Runs after the default menu has been installed, so there is something
@@ -36,6 +45,7 @@ pub fn run() {
             commands::get_file_diff,
             commands::get_file_contents,
             commands::get_image_bytes,
+            commands::get_ai_changelog,
             commands::get_git_alias_status,
             commands::install_git_alias,
             commands::get_settings,

@@ -306,7 +306,7 @@ const REPOSITORY: RepositoryInfo = {
 let settings: Settings = { ...DEFAULT_SETTINGS };
 
 const SAMPLE_BINARY = '/Applications/Diff Trek.app/Contents/MacOS/diff-trek';
-const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; "${SAMPLE_BINARY}" "$root" "$@" >/dev/null 2>&1 & }; f`;
+const SAMPLE_ALIAS = `!f() { root=$(git rev-parse --show-toplevel) || exit 1; case "$1" in -*) "${SAMPLE_BINARY}" "$root" "$@";; *) "${SAMPLE_BINARY}" "$root" "$@" >/dev/null 2>&1 & ;; esac; }; f`;
 
 /** The `git dt` alias, as far as the browser preview is concerned. */
 let gitAlias: GitAliasStatus = {

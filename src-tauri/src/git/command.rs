@@ -28,6 +28,12 @@ pub fn run(cwd: &Path, args: &[&str]) -> AppResult<GitOutput> {
     let output = Command::new("git")
         .args(BASE_ARGS)
         .args(args)
+        // Git translates parts of its own output — "Binary files … differ",
+        // "\ No newline at end of file" — and an AI changelog is matched
+        // against that text byte for byte, so a translated line would unmatch
+        // every note in the file. It also keeps `from_git_stderr`'s English
+        // phrases meaningful on a non-English system.
+        .env("LC_ALL", "C")
         .current_dir(cwd)
         .output()
         .map_err(|err| {

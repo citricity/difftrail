@@ -790,7 +790,7 @@
               <code>dt</code> alias it would replace, before it runs anything.
             </p>
             <p>Or set it yourself from a terminal:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; open -n "/Applications/Diff Trek.app" --args "$root" "$@"; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; case "$1" in -*) "/Applications/Diff Trek.app/Contents/MacOS/diff-trek" "$root" "$@";; *) open -n "/Applications/Diff Trek.app" --args "$root" "$@" ;; esac; }; f'</code></pre>
             <p class="muted">
               Install Diff Trek into Applications first. An alias pointing at the copy
               inside the disk image stops working as soon as the image is ejected.
@@ -803,7 +803,7 @@
           <div data-os="windows">
             <p class="os-label">Windows</p>
             <p>In Git Bash:</p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; "$LOCALAPPDATA/Diff Trek/diff-trek.exe" "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; case "$1" in -*) "$LOCALAPPDATA/Diff Trek/diff-trek.exe" "$root" "$@";; *) "$LOCALAPPDATA/Diff Trek/diff-trek.exe" "$root" "$@" >/dev/null 2>&amp;1 &amp; ;; esac; }; f'</code></pre>
             <p class="muted">
               Git runs aliases through its own shell, so <code>git dt</code> then works
               from PowerShell and Command Prompt too.
@@ -816,7 +816,7 @@
               For the <code>.deb</code> or <code>.rpm</code>, which install
               <code>diff-trek</code> onto your <code>PATH</code>:
             </p>
-            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; diff-trek "$root" "$@" >/dev/null 2>&amp;1 &amp; }; f'</code></pre>
+            <pre><code>git config --global alias.dt '!f() { root=$(git rev-parse --show-toplevel) || exit 1; case "$1" in -*) diff-trek "$root" "$@";; *) diff-trek "$root" "$@" >/dev/null 2>&amp;1 &amp; ;; esac; }; f'</code></pre>
             <p>
               For the AppImage, put it somewhere permanent first and use its full path
               in place of <code>diff-trek</code>, for example

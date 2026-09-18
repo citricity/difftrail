@@ -62,6 +62,13 @@ pub struct AliasStatus {
 /// alias's own arguments to `f`, and `"$@"` passes them on after the root, so
 /// `git dt main...HEAD` opens that range.
 ///
+/// An argument beginning with `-` means a command-line request rather than a
+/// window — `git dt --createchangelog="claude"` — so the executable is run in
+/// the foreground, unredirected, and its output reaches the terminal that asked
+/// for it. Neither of the window launches below can do that: one discards
+/// stdout, and the other hands the process to LaunchServices, which has no
+/// terminal to write to.
+///
 /// Inside a `.app` bundle the launch goes through `open -n` rather than
 /// running the executable. A process the terminal starts directly is not a
 /// launch the user asked for as far as macOS is concerned, so since macOS 14
@@ -70,17 +77,22 @@ pub struct AliasStatus {
 /// `git dt`, as running the executable did, and `open` returns at once, so
 /// nothing is backgrounded.
 pub fn alias_value(binary: &str) -> String {
-    let launch = match app_bundle(binary) {
+    let executable = escape_double_quoted(binary);
+    let window = match app_bundle(binary) {
         Some(bundle) => format!(
-            "open -n \"{}\" --args \"$root\" \"$@\";",
+            "open -n \"{}\" --args \"$root\" \"$@\"",
             escape_double_quoted(bundle)
         ),
-        None => format!(
-            "\"{}\" \"$root\" \"$@\" >/dev/null 2>&1 &",
-            escape_double_quoted(binary)
-        ),
+        None => format!("\"{executable}\" \"$root\" \"$@\" >/dev/null 2>&1 &"),
     };
-    format!("!f() {{ root=$(git rev-parse --show-toplevel) || exit 1; {launch} }}; f")
+
+    format!(
+        "!f() {{ root=$(git rev-parse --show-toplevel) || exit 1; \
+         case \"$1\" in \
+         -*) \"{executable}\" \"$root\" \"$@\";; \
+         *) {window} ;; \
+         esac; }}; f"
+    )
 }
 
 /// The `.app` bundle an executable is the main binary of:
@@ -250,7 +262,10 @@ mod tests {
         assert_eq!(
             alias_value("/Applications/Diff Trek.app/Contents/MacOS/diff-trek"),
             "!f() { root=$(git rev-parse --show-toplevel) || exit 1; \
-             open -n \"/Applications/Diff Trek.app\" --args \"$root\" \"$@\"; }; f"
+             case \"$1\" in \
+             -*) \"/Applications/Diff Trek.app/Contents/MacOS/diff-trek\" \"$root\" \"$@\";; \
+             *) open -n \"/Applications/Diff Trek.app\" --args \"$root\" \"$@\" ;; \
+             esac; }; f"
         );
     }
 
@@ -259,8 +274,29 @@ mod tests {
         assert_eq!(
             alias_value("/usr/bin/diff-trek"),
             "!f() { root=$(git rev-parse --show-toplevel) || exit 1; \
-             \"/usr/bin/diff-trek\" \"$root\" \"$@\" >/dev/null 2>&1 & }; f"
+             case \"$1\" in \
+             -*) \"/usr/bin/diff-trek\" \"$root\" \"$@\";; \
+             *) \"/usr/bin/diff-trek\" \"$root\" \"$@\" >/dev/null 2>&1 & ;; \
+             esac; }; f"
         );
+    }
+
+    #[test]
+    fn a_command_line_request_runs_in_the_foreground_on_either_platform() {
+        // Nothing may be redirected or detached here: this is the path that has
+        // to hand a file location back to whoever typed the command.
+        for binary in [
+            "/Applications/Diff Trek.app/Contents/MacOS/diff-trek",
+            "/usr/bin/diff-trek",
+        ] {
+            let value = alias_value(binary);
+            let cli = value.split("-*)").nth(1).unwrap().split(";;").next().unwrap();
+
+            assert!(cli.contains(&format!("\"{binary}\" \"$root\" \"$@\"")), "{cli}");
+            assert!(!cli.contains(">/dev/null"), "{cli}");
+            assert!(!cli.contains("open -n"), "{cli}");
+            assert!(!cli.contains('&'), "{cli}");
+        }
     }
 
     #[test]
