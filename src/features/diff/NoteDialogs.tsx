@@ -144,7 +144,7 @@ function Header({
   nav,
   onClose,
 }: {
-  title: string;
+  title: ReactNode;
   nav?: ReactNode;
   onClose: () => void;
 }) {
@@ -362,7 +362,14 @@ function ChangeAccordion({
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
-        <span className={styles.label}>{notes.labelOf(changeId)}</span>
+        <span
+          className={styles.label}
+          style={
+            { '--note-lane': laneColour(notes.labelOf(changeId)) } as CSSProperties
+          }
+        >
+          {notes.labelOf(changeId)}
+        </span>
         <span className={open ? styles.fullLine : styles.oneLine}>
           {description}
         </span>
@@ -418,7 +425,22 @@ function ChangeDialog({
   return (
     <>
       <Header
-        title={`Logical change ${notes.labelOf(changeId)}`}
+        title={
+          // The letter first and in the change's own colour, as the gutter and
+          // the contents list both draw it — the title names the mark the
+          // reader clicked rather than describing it.
+          <span className={styles.changeTitle}>
+            <span
+              className={styles.titleLabel}
+              style={
+                { '--note-lane': laneColour(notes.labelOf(changeId)) } as CSSProperties
+              }
+            >
+              {notes.labelOf(changeId)}
+            </span>
+            Logical change
+          </span>
+        }
         nav={
           onStep === undefined || hunks.length < 2 ? undefined : (
             // The change's own hunks, walked in the order the list below shows

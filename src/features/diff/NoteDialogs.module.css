@@ -183,16 +183,39 @@
   background: var(--surface-hover);
 }
 
+/* Every letter in these dialogs is drawn in its change's own colour, the way
+   the gutter draws it: the letter is what identifies a change, and it should
+   not change colour depending on which window the reader is looking at. */
 .label {
   flex: 0 0 auto;
   min-width: 15px;
   padding: 1px 4px;
   border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--note-lane);
+  color: var(--note-badge-text);
   font-size: 10px;
   font-weight: 600;
   text-align: center;
+}
+
+/* The file-path title reads right to left so a long path truncates from its
+   start; a change's title is ordinary text and must not. */
+.changeTitle {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  direction: ltr;
+}
+
+.titleLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  background: var(--note-lane);
+  color: var(--note-badge-text);
 }
 
 /* Collapsed: one line, cut off. The whole point of the accordion is that the
