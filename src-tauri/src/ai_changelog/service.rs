@@ -393,13 +393,19 @@ fn describes(changelog: &Changelog, comparison: &Comparison) -> bool {
         return true;
     };
 
-    match comparison {
-        Comparison::WorkingTree => against.kind == "workingTree",
-        Comparison::Commits { base, target } => {
-            against.kind == "commits"
-                && against.base.as_ref() == Some(base)
-                && against.target.as_ref() == Some(target)
+    match (against.kind.as_str(), comparison) {
+        ("workingTree", Comparison::WorkingTree) => true,
+        ("workingTree", Comparison::Commits { .. }) => false,
+        ("commits", Comparison::Commits { base, target }) => {
+            against.base.as_ref() == Some(base) && against.target.as_ref() == Some(target)
         }
+        ("commits", Comparison::WorkingTree) => false,
+        // A kind from a newer Diff Trek, or a writer of its own. Unknown means
+        // unknown: let content matching decide, the same as a changelog that
+        // does not carry the field at all. Reading it as "a different
+        // comparison" would throw away every note over a value we simply have
+        // not met before.
+        _ => true,
     }
 }
 
@@ -453,6 +459,29 @@ mod tests {
             }
         ));
         assert!(!describes(&changelog, &Comparison::WorkingTree));
+    }
+
+    #[test]
+    fn a_comparison_kind_we_do_not_recognise_is_not_a_reason_to_ignore_a_changelog() {
+        // The shell script wrote one of these before it knew better. Unknown
+        // has to mean unknown, or a value we have not met throws away every
+        // note in the file.
+        let mut changelog =
+            format::parse(&format::render("AB99X7", &ChangeInfo::default(), "")).unwrap();
+        changelog.info.captured_against = Some(CapturedAgainst {
+            kind: "somethingNew".into(),
+            base: None,
+            target: None,
+        });
+
+        assert!(describes(&changelog, &Comparison::WorkingTree));
+        assert!(describes(
+            &changelog,
+            &Comparison::Commits {
+                base: "aaa".into(),
+                target: "bbb".into()
+            }
+        ));
     }
 
     #[test]

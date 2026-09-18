@@ -54,8 +54,14 @@ pub fn cli_request() -> Option<CliRequest> {
 }
 
 pub(crate) fn cli_request_from(args: impl Iterator<Item = String>) -> Option<CliRequest> {
-    let mut args = args;
+    request_from(&mut args.peekable())
+}
 
+/// Split out so a test can see what was left in the iterator: the point of
+/// peeking is that a flag we decide not to use is still there afterwards.
+fn request_from<I: Iterator<Item = String>>(
+    args: &mut std::iter::Peekable<I>,
+) -> Option<CliRequest> {
     while let Some(arg) = args.next() {
         let Some(rest) = arg.strip_prefix(CREATE_CHANGELOG_FLAG) else {
             continue;
@@ -64,11 +70,13 @@ pub(crate) fn cli_request_from(args: impl Iterator<Item = String>) -> Option<Cli
         let author = match rest.chars().next() {
             // `--createchangelog=claude`
             Some('=') => rest[1..].to_string(),
-            // `--createchangelog claude`, but never swallowing the next flag.
-            None => args
-                .next()
-                .filter(|next| !next.starts_with('-'))
-                .unwrap_or_default(),
+            // `--createchangelog claude`. Peeked rather than taken, so a
+            // following flag is left where it is: `--createchangelog --example`
+            // has no author *and* still has its `--example`.
+            None => match args.peek() {
+                Some(next) if !next.starts_with('-') => args.next().unwrap_or_default(),
+                _ => String::new(),
+            },
             // `--createchangelogs`, which is a different flag entirely.
             Some(_) => continue,
         };
@@ -285,6 +293,33 @@ mod tests {
                 author: String::new()
             })
         );
+    }
+
+    #[test]
+    fn a_flag_after_the_option_is_left_for_whoever_parses_it() {
+        // `--createchangelog` takes the next argument as the author only when
+        // it is not itself a flag — and does not swallow it either way.
+        let mut args = args(&["--createchangelog", "--example", "/repos/alpha"]).peekable();
+        let request = request_from(&mut args);
+
+        assert_eq!(
+            request,
+            Some(CliRequest::CreateChangelog {
+                author: String::new()
+            })
+        );
+        assert_eq!(
+            args.collect::<Vec<_>>(),
+            ["--example".to_string(), "/repos/alpha".to_string()]
+        );
+    }
+
+    #[test]
+    fn an_author_that_is_not_a_flag_is_taken() {
+        let mut args = args(&["--createchangelog", "copilot", "main...HEAD"]).peekable();
+        request_from(&mut args);
+
+        assert_eq!(args.collect::<Vec<_>>(), ["main...HEAD".to_string()]);
     }
 
     #[test]

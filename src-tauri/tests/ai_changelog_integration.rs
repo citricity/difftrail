@@ -530,6 +530,62 @@ fn the_shell_script_excludes_the_changelog_folder_too() {
 }
 
 #[test]
+fn the_script_can_annotate_a_commit_even_though_it_records_no_comparison() {
+    // It leaves `capturedAgainst` out rather than inventing a kind the app
+    // cannot read, so the notes are found by matching on content alone.
+    let repo = Repo::new("script-revisions");
+    repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
+    repo.git(&["add", "-A"]);
+    repo.git(&["commit", "-m", "caps"]);
+
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../scripts/difftrek-changelog.sh"
+    );
+
+    let output = Command::new("sh")
+        .arg(script)
+        .arg("--author=claude")
+        .arg("HEAD^")
+        .arg("HEAD")
+        .current_dir(&repo.root)
+        .output()
+        .expect("sh");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let written = PathBuf::from(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .next()
+            .unwrap()
+            .to_string(),
+    );
+    let changelog = format::parse(&fs::read_to_string(&written).unwrap()).unwrap();
+    assert!(changelog.info.captured_against.is_none());
+    assert!(changelog.warnings.is_empty(), "{:?}", changelog.warnings);
+
+    let head = repo.git(&["rev-parse", "HEAD"]).trim().to_string();
+    let parent = repo.git(&["rev-parse", "HEAD^"]).trim().to_string();
+    let commits = Comparison::Commits {
+        base: parent,
+        target: head,
+    };
+
+    let nonce = written.file_stem().unwrap().to_str().unwrap().to_string();
+    repo.explain(&nonce, "h1", "caps, as committed");
+
+    let loaded = service::load(&repo.root, &commits).expect("loaded");
+    assert_eq!(
+        loaded.annotations.hunks["src/one.ts:hunk:0"].reasons,
+        ["caps, as committed"]
+    );
+}
+
+#[test]
 fn a_binary_file_does_not_break_the_capture() {
     let repo = Repo::new("binary");
     fs::write(repo.root.join("logo.bin"), [0u8, 159, 146, 150]).unwrap();

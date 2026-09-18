@@ -47,8 +47,10 @@ fn create_changelog(author: &str) -> i32 {
         Err(error) => return fail(&error),
     };
 
-    // Everything but the path goes to stderr, so the first line of stdout is
-    // always the file and a caller can take it with `head -1`.
+    // The contract: stdout begins with the path — a caller can take it with
+    // `head -1` — and the instructions follow it there, for whoever reads the
+    // whole output. Diagnostics go to stderr so they cannot be mistaken for
+    // either.
     if let Some(note) = &created.ignored {
         eprintln!("{note}\n");
     }

@@ -155,15 +155,19 @@ done
 
 # --- write it -----------------------------------------------------------------
 
+# Only the working tree is recorded. Diff Trek's own comparison kinds are
+# "workingTree" and "commits" — and "commits" carries the two object ids it
+# resolved, which means repeating its rules for `A..B`, `A...B`, `X^!` and root
+# commits here. Inventing a third kind would be worse than saying nothing: the
+# app treats a kind it does not know as a different comparison and ignores the
+# changelog entirely. Left out, matching decides on content, as it does for any
+# changelog written before this field existed.
 if [ "$#" -eq 0 ]; then
-  captured_against='{
+  captured_against='  "capturedAgainst": {
     "kind": "workingTree"
-  }'
+  },'
 else
-  captured_against="{
-    \"kind\": \"revisions\",
-    \"label\": \"$*\"
-  }"
+  captured_against=""
 fi
 
 capture_args=$(
@@ -181,7 +185,7 @@ path="$CHANGELOG_DIR/$nonce.log"
   printf '%s:%s:CHANGE_INFO~~\n' "$MARKER" "$nonce"
   printf '{\n'
   printf '  "author": "%s",\n' "$author"
-  printf '  "capturedAgainst": %s,\n' "$captured_against"
+  if [ -n "$captured_against" ]; then printf '%s\n' "$captured_against"; fi
   printf '  "captureArgs": [\n%s\n  ],\n' "$capture_args"
   printf '  "toolVersion": "difftrek-changelog.sh",\n'
   printf '  "createdAt": "%s"\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
