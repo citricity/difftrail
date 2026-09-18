@@ -141,6 +141,34 @@ describe('the logical change dialog', () => {
   });
 });
 
+describe('the logical change dialog, given a thin payload', () => {
+  it('opens even when an empty issue list was left out of it altogether', () => {
+    const hunk = resolved();
+    const notes = view(hunk);
+
+    // What a backend that skips empty collections sends: no `associatedIssues`
+    // key at all, where the dialog expects an array it can measure.
+    const change = notes.changelog?.logicalChanges[0] as {
+      associatedIssues?: string[];
+    };
+    delete change.associatedIssues;
+
+    render(
+      <NoteDialogs
+        open={{ kind: 'change', changeId: '0' }}
+        notes={notes}
+        order={[hunk.hunkId]}
+        onClose={vi.fn()}
+        onGoToHunk={vi.fn()}
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Reset the error count')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+});
+
 describe('the contents dialog', () => {
   it('lists the changes with a hunk on screen, and how much each covers', async () => {
     const hunk = resolved();

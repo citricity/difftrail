@@ -374,6 +374,9 @@ function ChangeDialog({
   const change = notes.logicalChange(changeId);
   const hunks = hunksOfChange(order, notes.changelog?.hunks ?? {}, changeId);
   const tracker = notes.changelog?.issueTracker ?? null;
+  // Defaulted rather than indexed directly: a backend that omits an empty list
+  // would otherwise take the whole window down on a click.
+  const issues = change?.associatedIssues ?? [];
 
   return (
     <>
@@ -387,9 +390,9 @@ function ChangeDialog({
           {change?.description ?? 'This change is not in the changelog’s table.'}
         </p>
 
-        {change !== null && change.associatedIssues.length > 0 && (
+        {issues.length > 0 && (
           <p className={styles.issues}>
-            {change.associatedIssues.map((issue) =>
+            {issues.map((issue) =>
               tracker === null ? (
                 <span key={issue} className={styles.issue}>
                   #{issue}
