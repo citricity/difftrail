@@ -448,6 +448,88 @@ fn a_changelog_written_for_a_commit_is_not_shown_for_the_working_tree() {
 }
 
 #[test]
+fn the_shell_script_writes_a_changelog_diff_trek_can_read() {
+    // The script exists for agents that have the repository and a shell but not
+    // the app — often with no network to fetch it either. A file it writes has
+    // to be indistinguishable from one the app writes, or notes taken in a
+    // container would not match the diff on the desktop.
+    let repo = Repo::new("shell-script");
+    repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
+    repo.write("src/two.ts", "alpha();\nBETA();\n");
+
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../scripts/difftrek-changelog.sh"
+    );
+
+    // From a subdirectory, as an agent would run it.
+    let output = Command::new("sh")
+        .arg(script)
+        .arg("--author=claude")
+        .current_dir(repo.root.join("src"))
+        .env("LC_ALL", "C")
+        .output()
+        .expect("sh");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // The first line of stdout is the path, so a caller can take it directly.
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let written = PathBuf::from(stdout.lines().next().unwrap());
+    assert!(written.exists(), "{}", written.display());
+    assert!(stdout.contains("2 hunk(s) to explain"));
+
+    let changelog = format::parse(&fs::read_to_string(&written).unwrap()).unwrap();
+    let live = service::capture_diff(&repo.root, &Comparison::WorkingTree).unwrap();
+
+    assert_eq!(changelog.clean_diff, live, "the script's diff is not ours");
+    assert!(changelog.complete);
+    assert!(changelog.warnings.is_empty());
+    assert_eq!(changelog.info.author.as_deref(), Some("claude"));
+    assert_eq!(changelog.notes.len(), 2);
+
+    // And the notes it produces are found and matched like any other.
+    let nonce = written.file_stem().unwrap().to_str().unwrap().to_string();
+    repo.explain(&nonce, "h1", "written by the script, read by the app");
+
+    let loaded = service::load(&repo.root, &Comparison::WorkingTree).expect("loaded");
+    assert_eq!(
+        loaded.annotations.hunks["src/one.ts:hunk:0"].reasons,
+        ["written by the script, read by the app"]
+    );
+    assert!(loaded.annotations.summary.is_complete());
+}
+
+#[test]
+fn the_shell_script_excludes_the_changelog_folder_too() {
+    let repo = Repo::new("shell-script-exclude");
+    fs::write(repo.root.join(".git/info/exclude"), "").unwrap();
+    repo.write("src/one.ts", "one();\ntwo();\nTHREE();\nfour();\nfive();\n");
+
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../scripts/difftrek-changelog.sh"
+    );
+
+    for _ in 0..2 {
+        let output = Command::new("sh")
+            .arg(script)
+            .arg("--author=claude")
+            .current_dir(&repo.root)
+            .output()
+            .expect("sh");
+        assert!(output.status.success());
+    }
+
+    let exclude = fs::read_to_string(repo.root.join(".git/info/exclude")).unwrap();
+    assert_eq!(exclude.matches(".difftrek/").count(), 1, "{exclude}");
+}
+
+#[test]
 fn a_binary_file_does_not_break_the_capture() {
     let repo = Repo::new("binary");
     fs::write(repo.root.join("logo.bin"), [0u8, 159, 146, 150]).unwrap();

@@ -610,6 +610,7 @@
           <a href="#install">Install</a>
           <a class="optional" href="#open">Opening a repository</a>
           <a class="optional" href="#review">Reviewing</a>
+          <a class="optional" href="#ai-changelog">AI changelog</a>
           <a href="https://github.com/citricity/difftrek">GitHub</a>
         </nav>
       </div>
@@ -1003,6 +1004,75 @@ diff-trek ~/code/my-project main...HEAD</code></pre>
             system’s light or dark appearance. Changed images — PNG, JPEG, GIF, WebP,
             BMP, ICO and AVIF — are shown before and after, side by side, instead of
             being reported as a binary file.
+          </p>
+        </section>
+
+        <section id="ai-changelog">
+          <h2>AI changelog</h2>
+          <p>
+            A diff shows what changed. It does not show <em>why</em> — and that is
+            hardest to reconstruct for work an AI agent did while you were elsewhere.
+            Diff Trek can read a changelog written alongside the change and show the
+            reasoning beside each hunk, with related hunks grouped into one intent.
+          </p>
+          <p>
+            Diff Trek never calls a model. It reads a file, so this works with any
+            agent that can be told to write one.
+          </p>
+
+          <h3>Creating one</h3>
+          <p>
+            When the work is done, the agent runs this from inside the repository:
+          </p>
+          <pre><code>git dt --createchangelog="claude"</code></pre>
+          <p>
+            Diff Trek captures the diff, writes it to
+            <code>.difftrek/ai_changelog/</code> with a placeholder after every hunk,
+            and prints the file’s path and how to fill it in. The agent writes only
+            the reasons; it never types diff text, which is what keeps the changelog
+            matchable against the diff afterwards.
+          </p>
+
+          <h3>Agents that cannot run Diff Trek</h3>
+          <p>
+            An agent working in a container has your repository but not the desktop
+            app, and often no network to fetch it. The same job runs with nothing but
+            <code>git</code> and <code>sh</code>:
+          </p>
+          <pre><code>curl -fsSL https://citricity.github.io/difftrek/difftrek-changelog.sh -o difftrek-changelog.sh
+sh difftrek-changelog.sh --author="claude"</code></pre>
+          <p class="muted">
+            The script is published from the same source the app’s own tests check, so
+            the two produce identical files. Committing a copy into your repository
+            works equally well, and needs no network at all.
+          </p>
+
+          <h3>Telling your agent to use it</h3>
+          <p>
+            Paste this into your project’s <code>CLAUDE.md</code> or
+            <code>AGENTS.md</code>. It stays short deliberately: the command prints the
+            detail that changes with the format, so these instructions do not go stale.
+          </p>
+          <pre><code>## AI change log
+
+When you have finished a piece of work, record why you made each change.
+
+1. Run `git dt --createchangelog="claude"` — or, if Diff Trek is not
+   installed here, the script from
+   https://citricity.github.io/difftrek/difftrek-changelog.sh
+   (use your own name if you are a different agent).
+2. It prints the path of a changelog file, and instructions.
+3. Fill in each placeholder with **why** that hunk exists — not what it
+   does, the diff already shows that.
+4. Where several hunks serve one intent, wrap them in a LOGICAL_CHANGE
+   span and describe it in the LOGICAL_CHANGE_TABLE block.
+5. Edit only inside the tag blocks. Never retype or reformat the diff:
+   one altered space unmatches a hunk and loses its note.</code></pre>
+          <p class="muted">
+            <code>.difftrek/</code> is added to <code>.git/info/exclude</code> the first
+            time a changelog is written, so changelogs stay out of your diffs and out
+            of your history. Nothing is written to <code>.gitignore</code>, which is
+            shared with everyone else on the project.
           </p>
         </section>
 

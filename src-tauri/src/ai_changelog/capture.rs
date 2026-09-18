@@ -121,6 +121,39 @@ mod tests {
         assert_eq!(args.last().unwrap(), &exclude_pathspec());
     }
 
+    /// The shell script has to produce the same bytes as the app, or a
+    /// changelog written by an agent in a container will not match a diff read
+    /// by Diff Trek on the desktop. The lists are duplicated because the script
+    /// has to run where this crate cannot; this is what keeps them honest.
+    #[test]
+    fn pinned_flags_match_the_script() {
+        let script = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../scripts/difftrek-changelog.sh"
+        ))
+        .expect("scripts/difftrek-changelog.sh");
+
+        /// Reads a `NAME="…"` assignment, joining the backslash continuations
+        /// the script uses to keep its lines readable.
+        fn assignment(script: &str, name: &str) -> Vec<String> {
+            let start = script
+                .find(&format!("{name}=\""))
+                .unwrap_or_else(|| panic!("{name} not found in the script"));
+            let rest = &script[start + name.len() + 2..];
+            let end = rest.find('"').expect("unterminated assignment");
+
+            rest[..end]
+                .replace("\\\n", " ")
+                .split_whitespace()
+                .map(str::to_string)
+                .collect()
+        }
+
+        assert_eq!(assignment(&script, "GIT_CONFIG_ARGS"), CONFIG.to_vec());
+        assert_eq!(assignment(&script, "GIT_DIFF_FLAGS"), FLAGS.to_vec());
+        assert!(script.contains(&exclude_pathspec()));
+    }
+
     #[test]
     fn the_changelog_folder_is_excluded_from_the_repository_root() {
         // Anchored, or running from a subdirectory excludes the wrong folder

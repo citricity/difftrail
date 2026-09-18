@@ -12,6 +12,7 @@ on:
     branches: [main]
     paths:
       - docs/**
+      - scripts/difftrek-changelog.sh
       - .github/workflows/docs.yml
   workflow_dispatch:
 
@@ -37,6 +38,11 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp -R docs/. _site/
+
+          # Published from its source rather than a copy in docs/, so the file
+          # agents download is the one the Rust tests check against the app's
+          # own capture flags.
+          cp scripts/difftrek-changelog.sh _site/difftrek-changelog.sh
 
           # "Latest" is GitHub's: the newest published release that is neither
           # a draft nor a pre-release. Before the first one, the page says so.
