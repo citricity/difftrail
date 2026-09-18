@@ -126,5 +126,13 @@ export function useAiChangelog(ready: boolean): AiChangelogView & {
     setAttempt((value) => value + 1);
   }, []);
 
-  return { changelog, hunk, state, logicalChange, labelOf, describe, reload };
+  /**
+   * Memoised, because consumers hang memos off this object: App derives the
+   * change list, the document's notes and the navigation filter from it, and a
+   * fresh literal every render would rebuild all three on every keystroke.
+   */
+  return useMemo(
+    () => ({ changelog, hunk, state, logicalChange, labelOf, describe, reload }),
+    [changelog, hunk, state, logicalChange, labelOf, describe, reload],
+  );
 }

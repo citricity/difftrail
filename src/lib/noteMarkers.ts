@@ -9,7 +9,7 @@
  */
 
 import type { Direction, NavigationFilter } from './navigation.ts';
-import type { ResolvedHunk } from '../types/index.ts';
+import type { ChangeLocation, ResolvedHunk } from '../types/index.ts';
 
 export interface HunkMarkers {
   /** Logical changes whose run of hunks begins at this one. */
@@ -211,7 +211,8 @@ export function changeOfHunk(
 export function stepChange(
   changes: readonly ChangeEntry[],
   order: readonly string[],
-  currentHunkId: string | null,
+  fileOrder: readonly string[],
+  cursor: ChangeLocation | null,
   currentChange: string | null,
   direction: Direction,
 ): ChangeEntry | null {
@@ -219,7 +220,7 @@ export function stepChange(
 
   // Nowhere yet: Next enters at the top of the document and Previous at the
   // bottom, which is what the hunk arrows do from the same state.
-  if (currentHunkId === null) {
+  if (cursor === null) {
     return (direction === 'next' ? changes[0] : changes[changes.length - 1]) ?? null;
   }
 
@@ -232,12 +233,51 @@ export function stepChange(
     return changes[direction === 'next' ? at + 1 : at - 1] ?? null;
   }
 
-  const position = order.indexOf(currentHunkId);
+  const position = cursorPosition(order, fileOrder, cursor);
   const positionOf = (entry: ChangeEntry) => order.indexOf(entry.hunkId);
 
   return direction === 'next'
     ? (changes.find((entry) => positionOf(entry) > position) ?? null)
     : ([...changes].reverse().find((entry) => positionOf(entry) < position) ?? null);
+}
+
+/** The hunk's place within its file, from `<path>:hunk:<index>`. */
+function hunkIndex(hunkId: string): number {
+  return Number(hunkId.slice(hunkId.lastIndexOf(':') + 1));
+}
+
+/**
+ * Where the reader sits in the noted hunks, even when they are not on one.
+ *
+ * A cursor on a file header has no hunk, and a cursor on a hunk the changelog
+ * never saw is not in `order` at all; treating either as "nowhere" would send
+ * Next back to the top of the document from halfway down it. Both are placed
+ * by file and hunk index instead, and land on a half — between the noted hunk
+ * before them and the one after — so that Next finds the change ahead and
+ * Previous the one behind, without either claiming the cursor's own place.
+ */
+function cursorPosition(
+  order: readonly string[],
+  fileOrder: readonly string[],
+  cursor: ChangeLocation,
+): number {
+  if (cursor.hunkId !== null) {
+    const at = order.indexOf(cursor.hunkId);
+    if (at !== -1) return at;
+  }
+
+  const fileAt = new Map(fileOrder.map((fileId, index) => [fileId, index]));
+  const cursorFile = fileAt.get(cursor.fileId) ?? fileOrder.length;
+  // A file header sits before every hunk in its file.
+  const cursorHunk = cursor.hunkId === null ? -1 : hunkIndex(cursor.hunkId);
+
+  const before = order.filter((hunkId) => {
+    const file = fileAt.get(fileOfHunk(hunkId)) ?? fileOrder.length;
+    if (file !== cursorFile) return file < cursorFile;
+    return hunkIndex(hunkId) < cursorHunk;
+  }).length;
+
+  return before - 0.5;
 }
 
 /**

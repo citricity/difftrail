@@ -630,7 +630,7 @@
 
 .starts {
   background: var(--note-lane);
-  color: #ffffff;
+  color: var(--note-badge-text);
 }
 
 .ends {

@@ -75,6 +75,10 @@
   --note-lane-4: #9a6700;
   --note-lane-5: #cf222e;
   --note-unexplained: #9a6700;
+  /* Badge text on a filled lane. The light lanes are dark enough for white;
+     the dark theme's are bright enough that white falls below a readable
+     contrast, so the badge flips to the page colour there. */
+  --note-badge-text: #ffffff;
 
   --diff-add-bg: #e6ffec;
   --diff-add-gutter: #ccffd8;
@@ -141,6 +145,7 @@
     --note-lane-4: #d29922;
     --note-lane-5: #f85149;
     --note-unexplained: #d29922;
+    --note-badge-text: #0d1117;
 
     --diff-add-bg: rgb(46 160 67 / 15%);
     --diff-add-gutter: rgb(46 160 67 / 30%);

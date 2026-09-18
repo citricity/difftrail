@@ -81,7 +81,14 @@ export function NoteDialogs({
   };
 
   return (
-    <dialog ref={dialog} className={styles.dialog} onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      // Named by whichever header is rendered inside it. Without this the
+      // dialog announces itself as nothing at all.
+      aria-labelledby={TITLE_ID}
+      onClose={onClose}
+    >
       {open?.kind === 'hunk' && (
         <HunkDialog
           hunkId={open.hunkId}
@@ -121,10 +128,15 @@ export function NoteDialogs({
   );
 }
 
+/** One dialog is open at a time, so one id is enough to name it. */
+const TITLE_ID = 'note-dialog-title';
+
 function Header({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <header className={styles.header}>
-      <h2 className={styles.title}>{title}</h2>
+      <h2 id={TITLE_ID} className={styles.title}>
+        {title}
+      </h2>
       <button
         type="button"
         className={styles.close}

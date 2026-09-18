@@ -25,6 +25,16 @@ export interface Shortcuts {
   onEscape?: () => void;
 }
 
+/**
+ * True while a dialog is open over the document.
+ *
+ * jsdom has no `showModal`, so the dialogs fall back to the `open` attribute
+ * there; this asks the question the same way in both.
+ */
+function hasOpenDialog(): boolean {
+  return document.querySelector('dialog[open]') !== null;
+}
+
 /** True when the event came from somewhere the user is typing. */
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -45,32 +55,33 @@ export function useKeyboardShortcuts({
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key === 'Escape') {
-        // A modal dialog swallows its own Escape before this sees it, so this
-        // only ever reaches a focus with nothing on top of it.
-        if (onEscape === undefined) return;
+        // The listener is on the window, so it sees Escape raised inside an
+        // open dialog too — and calling preventDefault there would cancel the
+        // dialog's own close. Whatever is on top gets the key.
+        if (onEscape === undefined || hasOpenDialog()) return;
         event.preventDefault();
         onEscape();
         return;
       }
 
-      // Shifted: the same movement over logical changes.
-      const nextChange = event.key === 'N' || event.key === 'J';
-      const previousChange = event.key === 'P' || event.key === 'K';
+      // `n`/`p` mirror `less` and `git log`; `j`/`k` mirror vim. Both are
+      // muscle memory for the tools this sits alongside. Compared in lower
+      // case and paired with `shiftKey`, because Caps Lock also sends `N` —
+      // and someone with Caps Lock on has not asked for a bigger jump.
+      const key = event.key.toLowerCase();
+      const next = key === 'n' || key === 'j';
+      const previous = key === 'p' || key === 'k';
 
-      if (nextChange || previousChange) {
-        const step = nextChange ? onNextChange : onPreviousChange;
+      if (!next && !previous) return;
+
+      // Shifted: the same movement over logical changes.
+      if (event.shiftKey) {
+        const step = next ? onNextChange : onPreviousChange;
         if (step === undefined) return;
         event.preventDefault();
         step();
         return;
       }
-
-      // `n`/`p` mirror `less` and `git log`; `j`/`k` mirror vim. Both are
-      // muscle memory for the tools this sits alongside.
-      const next = event.key === 'n' || event.key === 'j';
-      const previous = event.key === 'p' || event.key === 'k';
-
-      if (!next && !previous) return;
 
       event.preventDefault();
       if (next) onNext();

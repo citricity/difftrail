@@ -41,6 +41,11 @@ export interface DiffNavigation {
    */
   goToFile: (fileId: string) => void;
   /**
+   * Jump to one hunk, which may be in a file nobody has opened yet: the file
+   * lands at once and the hunk follows when its diff arrives.
+   */
+  goToHunk: (fileId: string, hunkId: string) => void;
+  /**
    * Increments whenever the view must be brought to `current` even if
    * `current` has not changed. Picking the file you are already on, after
    * scrolling away from it, is a request to go back to it; without this the
@@ -160,6 +165,49 @@ export function useDiffNavigation(
     [ensureLoaded, files],
   );
 
+  /**
+   * The same two-step as `goToFile`, aimed at one hunk rather than at whatever
+   * the file starts with — what the changelog's markers, its contents list and
+   * the change bar's arrows all need.
+   *
+   * It runs on the same ticket as every other step, so a reader who moves on
+   * while the diff is loading is not yanked back to a target they have left.
+   * A file that comes back without the hunk the notes named leaves the reader
+   * on the file rather than pointing the cursor at a row the model does not
+   * have; so does a collapsed file, which has no hunk rows at all.
+   */
+  const goToHunk = useCallback(
+    (fileId: string, hunkId: string) => {
+      const file = files.find((candidate) => candidate.meta.id === fileId);
+      if (file === undefined) return;
+
+      const ticket = (token.current += 1);
+      setRevealRequest((previous) => previous + 1);
+
+      const settled = file.status === 'loaded' || file.status === 'error';
+      if (file.collapsed || settled) {
+        setNavigating(false);
+        setCurrent({ fileId, hunkId: file.collapsed ? null : hunkId });
+        return;
+      }
+
+      setCurrent({ fileId, hunkId: null });
+      setNavigating(true);
+
+      void ensureLoaded(fileId)
+        .then((diff) => {
+          if (ticket !== token.current) return;
+          if (diff !== null && diff.hunks.some((hunk) => hunk.id === hunkId)) {
+            setCurrent({ fileId, hunkId });
+          }
+        })
+        .finally(() => {
+          if (ticket === token.current) setNavigating(false);
+        });
+    },
+    [ensureLoaded, files],
+  );
+
   const currentIndex = indexOfLocation(entries, current);
 
   return {
@@ -175,6 +223,7 @@ export function useDiffNavigation(
     goPrevious,
     goTo,
     goToFile,
+    goToHunk,
     revealRequest,
   };
 }

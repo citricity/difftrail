@@ -23,10 +23,16 @@ export function NoteStatus({ summary }: Props) {
   // screen — so an unexplained hunk counts against it.
   if (isComplete(summary) && summary.unexplained === 0) return null;
 
+  const detail = explain(summary);
+
   return (
-    <span className={styles.warning} title={explain(summary)}>
+    <span className={styles.warning} title={detail}>
       <MessageSquareDashed size={13} aria-hidden="true" />
       {explained(summary)} / {summary.total}
+      {/* The ratio alone is meaningless read aloud, and `title` is a mouse
+          affordance — so the whole explanation is in the document too, where a
+          screen reader will find it. */}
+      <span className={styles.detail}>{detail}</span>
     </span>
   );
 }

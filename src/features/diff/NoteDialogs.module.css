@@ -1,7 +1,14 @@
+/* The contents list is as long as the diff has intents, so the dialog is
+   capped and its body scrolls: a list taller than the window would otherwise
+   carry the close button off the bottom of it. */
 .dialog {
+  display: flex;
+  flex-direction: column;
   width: 460px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
   padding: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -58,9 +65,12 @@
 
 .body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
   padding: 12px;
+  overflow-y: auto;
 }
 
 .text {
@@ -294,7 +304,7 @@
   padding: 0 2px;
   border-radius: var(--radius-sm);
   background: var(--note-lane);
-  color: #ffffff;
+  color: var(--note-badge-text);
   font-size: 9px;
   font-weight: 600;
   line-height: 1;

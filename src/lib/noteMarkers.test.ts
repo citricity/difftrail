@@ -191,9 +191,19 @@ describe('stepChange', () => {
   const order = ['a', 'b', 'c', 'd'];
   const changes = changesInOrder(order, hunks);
 
+  const files = ['a', 'b', 'c', 'd'];
+  const cursor = (hunkId: string | null) =>
+    hunkId === null ? null : { fileId: hunkId, hunkId };
+
   const step = (from: string | null, direction: 'next' | 'previous') =>
-    stepChange(changes, order, from, changeOfHunk(hunks, from), direction)?.id ??
-    null;
+    stepChange(
+      changes,
+      order,
+      files,
+      cursor(from),
+      changeOfHunk(hunks, from),
+      direction,
+    )?.id ?? null;
 
   it('moves change by change, not span by span', () => {
     expect(step('a', 'next')).toBe('1');
@@ -223,9 +233,53 @@ describe('stepChange', () => {
     // Both changes are on hunk b, so the hunk cannot say which one is being
     // read. Told the first, stepping must reach the second rather than
     // returning b again and leaving the reader stuck on it.
-    expect(stepChange(entries, order, 'b', '0', 'next')?.id).toBe('1');
-    expect(stepChange(entries, order, 'b', '1', 'next')).toBeNull();
-    expect(stepChange(entries, order, 'b', '1', 'previous')?.id).toBe('0');
+    const at = (hunkId: string) => ({ fileId: hunkId, hunkId });
+
+    expect(stepChange(entries, order, order, at('b'), '0', 'next')?.id).toBe('1');
+    expect(stepChange(entries, order, order, at('b'), '1', 'next')).toBeNull();
+    expect(stepChange(entries, order, order, at('b'), '1', 'previous')?.id).toBe(
+      '0',
+    );
+  });
+
+  // A cursor on a file header, or on a hunk the changelog never saw, is not in
+  // the noted order at all. Treating either as "nowhere" sent Next back to the
+  // top of the document from halfway down it.
+  describe('a cursor that is not on a noted hunk', () => {
+    const noted = {
+      'one.ts:hunk:0': hunk(['0']),
+      'three.ts:hunk:0': hunk(['1']),
+    };
+    const order = ['one.ts:hunk:0', 'three.ts:hunk:0'];
+    const files = ['one.ts', 'two.ts', 'three.ts'];
+    const entries = changesInOrder(order, noted);
+
+    const from = (cursor: { fileId: string; hunkId: string | null }) => ({
+      next: stepChange(entries, order, files, cursor, null, 'next')?.id ?? null,
+      previous:
+        stepChange(entries, order, files, cursor, null, 'previous')?.id ?? null,
+    });
+
+    it('steps on from the file header it is sitting on', () => {
+      expect(from({ fileId: 'two.ts', hunkId: null })).toEqual({
+        next: '1',
+        previous: '0',
+      });
+    });
+
+    it('steps on from a hunk the changelog has never seen', () => {
+      expect(from({ fileId: 'two.ts', hunkId: 'two.ts:hunk:3' })).toEqual({
+        next: '1',
+        previous: '0',
+      });
+    });
+
+    it('does not count the cursor\'s own file as behind it', () => {
+      expect(from({ fileId: 'one.ts', hunkId: null })).toEqual({
+        next: '0',
+        previous: null,
+      });
+    });
   });
 });
 

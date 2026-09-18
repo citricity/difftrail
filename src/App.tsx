@@ -67,9 +67,10 @@ export function App() {
    * The AI changelog for what is on screen, if an agent wrote one.
    *
    * Loaded once the file list is in, because a changelog describes a diff and
-   * there is nothing to describe before that.
+   * there is nothing to describe before that — and not at all when startup
+   * failed, where asking would only add a second error to the first.
    */
-  const changelog = useAiChangelog(state.phase !== 'starting');
+  const changelog = useAiChangelog(state.phase === 'ready');
   const hasNotes = changelog.changelog !== null;
 
   /**
@@ -205,9 +206,14 @@ export function App() {
    * files whose diffs have not been read yet, so the counter does not climb
    * as the reader scrolls.
    */
+  const fileOrder = useMemo(
+    () => state.files.map((file) => file.meta.id),
+    [state.files],
+  );
+
   const notedOrder = useMemo(
-    () => documentOrder(state.files.map((file) => file.meta.id), notedHunks),
-    [state.files, notedHunks],
+    () => documentOrder(fileOrder, notedHunks),
+    [fileOrder, notedHunks],
   );
 
   const changes = useMemo(
@@ -241,39 +247,25 @@ export function App() {
   const nextChange = stepChange(
     changes,
     notedOrder,
-    currentHunk,
+    fileOrder,
+    navigation.current,
     currentChange,
     'next',
   );
   const previousChange = stepChange(
     changes,
     notedOrder,
-    currentHunk,
+    fileOrder,
+    navigation.current,
     currentChange,
     'previous',
   );
 
-  /**
-   * Reveals a hunk that may be in a file nobody has opened yet.
-   *
-   * The file lands first and the hunk follows when its diff arrives, which is
-   * what `goToFile` does for the file navigator: the jump happens at once
-   * rather than after a wait with nothing moving.
-   */
   const revealHunk = useCallback(
     (hunkId: string) => {
-      const fileId = fileOfHunk(hunkId);
-      const file = state.files.find((candidate) => candidate.meta.id === fileId);
-
-      if (file !== undefined && file.status !== 'loaded' && !file.collapsed) {
-        navigation.goTo({ fileId, hunkId: null });
-        void ensureLoaded(fileId).then(() => navigation.goTo({ fileId, hunkId }));
-        return;
-      }
-
-      navigation.goTo({ fileId, hunkId });
+      navigation.goToHunk(fileOfHunk(hunkId), hunkId);
     },
-    [ensureLoaded, navigation, state.files],
+    [navigation],
   );
 
   /**

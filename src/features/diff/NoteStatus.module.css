@@ -16,3 +16,16 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* Read by screen readers, and by nothing else. */
+.detail {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

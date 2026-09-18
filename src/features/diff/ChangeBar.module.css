@@ -57,7 +57,7 @@
   border: 1px solid var(--note-lane);
   border-radius: var(--radius-sm);
   background: var(--note-lane);
-  color: #ffffff;
+  color: var(--note-badge-text);
   font-size: 9px;
   font-weight: 600;
   line-height: 1;
