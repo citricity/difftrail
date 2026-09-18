@@ -447,6 +447,7 @@ fn a_changelog_written_for_a_commit_is_not_shown_for_the_working_tree() {
     assert!(service::load(&repo.root, &Comparison::WorkingTree).is_none());
 }
 
+#[cfg(unix)]
 #[test]
 fn the_shell_script_writes_a_changelog_diff_trek_can_read() {
     // The script exists for agents that have the repository and a shell but not
