@@ -28,10 +28,13 @@ interface Props {
   offset: number;
   active: boolean;
   /**
-   * Logical change markers for this line. Only the old side carries them —
-   * once per row, not once per pane — but the column itself is drawn in both,
-   * because the two panes must stay the same width for the wrap column they
-   * share to mean anything.
+   * Logical change markers for this line, drawn once per row rather than once
+   * per pane: the old side carries them, or the new side when the row has no
+   * old line at all. An absent pane renders no gutter, so leaving them with the
+   * old side unconditionally loses every marker on an addition.
+   *
+   * The column itself is drawn in both panes regardless, because the two must
+   * stay the same width for the wrap column they share to mean anything.
    */
   notes?: ReactNode;
   /** Absolute position within the document canvas, set by the virtualiser. */
@@ -152,10 +155,16 @@ function SplitLineRowImpl({
         entry={left}
         wrapColumn={wrapColumn}
         offset={offset}
-        notes={notes}
+        notes={left === null ? undefined : notes}
       />
       <span className={styles.paneDivider} aria-hidden="true" />
-      <Pane side="right" entry={right} wrapColumn={wrapColumn} offset={offset} />
+      <Pane
+        side="right"
+        entry={right}
+        wrapColumn={wrapColumn}
+        offset={offset}
+        notes={left === null ? notes : undefined}
+      />
     </div>
   );
 }

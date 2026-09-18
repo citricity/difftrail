@@ -8,7 +8,7 @@
  */
 
 import { MessageSquareDashed } from 'lucide-react';
-import { changedSince, isComplete } from '../../types/index.ts';
+import { changedSince, explained, isComplete } from '../../types/index.ts';
 import type { MatchSummary } from '../../types/index.ts';
 import styles from './NoteStatus.module.css';
 
@@ -17,12 +17,16 @@ interface Props {
 }
 
 export function NoteStatus({ summary }: Props) {
-  if (isComplete(summary)) return null;
+  // `isComplete` mirrors the rule the backend uses to choose between changelog
+  // files, where a hunk nobody explained is no reason to reject one. The
+  // reader's question here is different — does this account for everything on
+  // screen — so an unexplained hunk counts against it.
+  if (isComplete(summary) && summary.unexplained === 0) return null;
 
   return (
     <span className={styles.warning} title={explain(summary)}>
       <MessageSquareDashed size={13} aria-hidden="true" />
-      {summary.matched} / {summary.total}
+      {explained(summary)} / {summary.total}
     </span>
   );
 }
@@ -36,8 +40,14 @@ export function NoteStatus({ summary }: Props) {
  */
 function explain(summary: MatchSummary): string {
   const lines = [
-    `The AI changelog describes ${summary.matched} of ${summary.total} hunks on screen.`,
+    `The AI changelog explains ${explained(summary)} of ${summary.total} hunks on screen.`,
   ];
+
+  if (summary.unexplained > 0) {
+    lines.push(
+      `${summary.unexplained} ${summary.unexplained === 1 ? 'hunk is' : 'hunks are'} in it with no reason recorded.`,
+    );
+  }
 
   const since = changedSince(summary);
   if (since > 0) {

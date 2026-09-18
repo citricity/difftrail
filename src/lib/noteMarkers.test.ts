@@ -192,7 +192,8 @@ describe('stepChange', () => {
   const changes = changesInOrder(order, hunks);
 
   const step = (from: string | null, direction: 'next' | 'previous') =>
-    stepChange(changes, order, from, hunks, direction)?.id ?? null;
+    stepChange(changes, order, from, changeOfHunk(hunks, from), direction)?.id ??
+    null;
 
   it('moves change by change, not span by span', () => {
     expect(step('a', 'next')).toBe('1');
@@ -212,6 +213,19 @@ describe('stepChange', () => {
   it('steps to the nearest change from a hunk that belongs to none', () => {
     expect(step('b', 'next')).toBe('1');
     expect(step('b', 'previous')).toBe('0');
+  });
+
+  it('reaches the second intent on a hunk that serves two', () => {
+    const shared = { a: hunk(['0']), b: hunk(['0', '1']) };
+    const order = ['a', 'b'];
+    const entries = changesInOrder(order, shared);
+
+    // Both changes are on hunk b, so the hunk cannot say which one is being
+    // read. Told the first, stepping must reach the second rather than
+    // returning b again and leaving the reader stuck on it.
+    expect(stepChange(entries, order, 'b', '0', 'next')?.id).toBe('1');
+    expect(stepChange(entries, order, 'b', '1', 'next')).toBeNull();
+    expect(stepChange(entries, order, 'b', '1', 'previous')?.id).toBe('0');
   });
 });
 

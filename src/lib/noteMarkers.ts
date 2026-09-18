@@ -201,12 +201,18 @@ export function changeOfHunk(
  * From a hunk no change covers — an older changelog, where coverage was not
  * required — there is no current change to move from, so the nearest one in
  * the direction of travel is the answer rather than nothing at all.
+ *
+ * `currentChange` is passed in rather than read back off the hunk, because a
+ * hunk can serve two intents and the hunk alone cannot say which of them the
+ * reader is on. Deriving it here would strand the second: stepping from the
+ * first would land on the same hunk, the hunk would name the first again, and
+ * the arrows would never reach the other.
  */
 export function stepChange(
   changes: readonly ChangeEntry[],
   order: readonly string[],
   currentHunkId: string | null,
-  hunks: Readonly<Record<string, ResolvedHunk>>,
+  currentChange: string | null,
   direction: Direction,
 ): ChangeEntry | null {
   if (changes.length === 0) return null;
@@ -217,8 +223,10 @@ export function stepChange(
     return (direction === 'next' ? changes[0] : changes[changes.length - 1]) ?? null;
   }
 
-  const current = changeOfHunk(hunks, currentHunkId);
-  const at = current === null ? -1 : changes.findIndex((entry) => entry.id === current);
+  const at =
+    currentChange === null
+      ? -1
+      : changes.findIndex((entry) => entry.id === currentChange);
 
   if (at !== -1) {
     return changes[direction === 'next' ? at + 1 : at - 1] ?? null;

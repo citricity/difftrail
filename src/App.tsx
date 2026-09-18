@@ -216,15 +216,40 @@ export function App() {
   );
 
   const currentHunk = navigation.current?.hunkId ?? null;
-  const currentChange = focused ?? changeOfHunk(notedHunks, currentHunk);
+
+  /**
+   * The change the reader stepped to, which only the reader can say.
+   *
+   * A hunk may serve two intents, and the hunk cannot name which of them is
+   * being read — so stepping onto a shared hunk would otherwise be read back as
+   * the first of its changes, and the second would be unreachable. Kept only
+   * while it still covers the hunk in view: scroll away and the bar goes back
+   * to naming what is under the cursor.
+   */
+  const [requestedChange, setRequestedChange] = useState<string | null>(null);
+  const hunkChanges =
+    currentHunk === null ? undefined : notedHunks[currentHunk]?.logicalChangeIds;
+  const stepped =
+    requestedChange !== null && (hunkChanges?.includes(requestedChange) ?? false)
+      ? requestedChange
+      : null;
+
+  const currentChange =
+    focused ?? stepped ?? changeOfHunk(notedHunks, currentHunk);
   const changePosition = changes.findIndex((entry) => entry.id === currentChange);
 
-  const nextChange = stepChange(changes, notedOrder, currentHunk, notedHunks, 'next');
+  const nextChange = stepChange(
+    changes,
+    notedOrder,
+    currentHunk,
+    currentChange,
+    'next',
+  );
   const previousChange = stepChange(
     changes,
     notedOrder,
     currentHunk,
-    notedHunks,
+    currentChange,
     'previous',
   );
 
@@ -262,6 +287,7 @@ export function App() {
       if (target === null) return;
 
       revealHunk(target.hunkId);
+      setRequestedChange(target.id);
       if (focused !== null) setFocused(target.id);
     },
     [focused, nextChange, previousChange, revealHunk],
@@ -375,7 +401,10 @@ export function App() {
           onGoToHunk={(_fileId, hunkId) => revealHunk(hunkId)}
           onOpenChange={(changeId) => {
             const entry = changes.find((candidate) => candidate.id === changeId);
-            if (entry !== undefined) revealHunk(entry.hunkId);
+            if (entry !== undefined) {
+              revealHunk(entry.hunkId);
+              setRequestedChange(changeId);
+            }
             setNoteDialog(null);
           }}
           focused={focused}

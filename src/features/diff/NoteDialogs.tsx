@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CornerDownRight, Crosshair, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { AiChangelogView } from '../../hooks/useAiChangelog.ts';
+import { issueUrl } from '../../lib/issues.ts';
 import {
   changesInOrder,
   fileOfHunk,
@@ -392,8 +393,10 @@ function ChangeDialog({
 
         {issues.length > 0 && (
           <p className={styles.issues}>
-            {issues.map((issue) =>
-              tracker === null ? (
+            {issues.map((issue) => {
+              const href = issueUrl(tracker, issue);
+
+              return href === null ? (
                 <span key={issue} className={styles.issue}>
                   #{issue}
                 </span>
@@ -401,14 +404,14 @@ function ChangeDialog({
                 <a
                   key={issue}
                   className={styles.issue}
-                  href={`${tracker.replace(/\/$/, '')}/${issue}`}
+                  href={href}
                   target="_blank"
                   rel="noreferrer"
                 >
                   #{issue}
                 </a>
-              ),
-            )}
+              );
+            })}
           </p>
         )}
 
