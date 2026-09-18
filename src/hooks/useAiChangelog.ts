@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAiChangelog } from '../services/backend.ts';
 import type { AiChangelog, LogicalChange, ResolvedHunk } from '../types/index.ts';
+import type { RunJump } from '../lib/noteMarkers.ts';
 
 /**
  * How a hunk stands with respect to the changelog.
@@ -34,12 +35,8 @@ export interface DocumentNotes {
   describe: (change: string) => string;
   onOpenHunk: (hunkId: string) => void;
   onOpenChange: (change: string) => void;
-  /** Go to the run of `change` above or below the one `hunkId` sits in. */
-  onJumpRun: (
-    change: string,
-    hunkId: string,
-    direction: 'above' | 'below',
-  ) => void;
+  /** Follow `change` from the run `hunkId` sits in, whichever way the arrow points. */
+  onJumpRun: (change: string, hunkId: string, kind: RunJump) => void;
 }
 
 export interface AiChangelogData {

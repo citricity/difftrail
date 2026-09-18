@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  adjacentRun,
   buildNoteMarkers,
   changeLabel,
   changeOfHunk,
@@ -9,6 +8,7 @@ import {
   labelChanges,
   focusFilter,
   hunksOfChange,
+  jumpTarget,
   laneColour,
   stepChange,
   ungroupedHunks,
@@ -343,6 +343,22 @@ describe('a change that opens more than once', () => {
     expect(markers.c.continuesBelow).toEqual([]);
   });
 
+  it('says how far the run under the marker itself reaches', () => {
+    const markers = markersFor(['a', 'b', 'c'], { a: ['0'], b: ['0'], c: [] });
+
+    expect(markers.a.runEndBelow).toEqual(['0']);
+    expect(markers.a.runStartAbove).toEqual([]);
+    expect(markers.b.runStartAbove).toEqual(['0']);
+    expect(markers.b.runEndBelow).toEqual([]);
+  });
+
+  it('offers no far end when the run is a single hunk', () => {
+    const markers = markersFor(['a'], { a: ['0'] });
+
+    expect(markers.a.runEndBelow).toEqual([]);
+    expect(markers.a.runStartAbove).toEqual([]);
+  });
+
   it('says nothing about a change with only one run', () => {
     const markers = markersFor(['a', 'b'], { a: ['0'], b: ['0'] });
 
@@ -360,7 +376,7 @@ describe('a change that opens more than once', () => {
   });
 });
 
-describe('adjacentRun', () => {
+describe('jumpTarget', () => {
   const hunks = {
     a: hunk(['0']),
     b: hunk([]),
@@ -370,28 +386,39 @@ describe('adjacentRun', () => {
     f: hunk(['0']),
   };
   const order = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const to = (from: string, kind: Parameters<typeof jumpTarget>[4]) =>
+    jumpTarget(order, hunks, '0', from, kind);
 
-  it('lands on the first hunk of the next run, not the next hunk', () => {
-    expect(adjacentRun(order, hunks, '0', 'a', 'below')).toBe('c');
-    expect(adjacentRun(order, hunks, '0', 'd', 'below')).toBe('f');
-  });
-
-  it('goes back to the top of the previous run', () => {
-    expect(adjacentRun(order, hunks, '0', 'f', 'above')).toBe('c');
-    expect(adjacentRun(order, hunks, '0', 'c', 'above')).toBe('a');
+  it('leaves for the run before or after, landing where it begins', () => {
+    expect(to('a', 'nextRun')).toBe('c');
+    expect(to('d', 'nextRun')).toBe('f');
+    expect(to('f', 'previousRun')).toBe('c');
+    expect(to('c', 'previousRun')).toBe('a');
   });
 
   it('treats a run as one, wherever in it the reader clicked', () => {
-    expect(adjacentRun(order, hunks, '0', 'c', 'below')).toBe('f');
-    expect(adjacentRun(order, hunks, '0', 'd', 'above')).toBe('a');
+    expect(to('d', 'nextRun')).toBe('f');
+    expect(to('d', 'previousRun')).toBe('a');
   });
 
-  it('has nowhere to go at either end', () => {
-    expect(adjacentRun(order, hunks, '0', 'a', 'above')).toBeNull();
-    expect(adjacentRun(order, hunks, '0', 'f', 'below')).toBeNull();
+  it('travels between the two ends of the run it is in', () => {
+    expect(to('c', 'runEnd')).toBe('d');
+    expect(to('d', 'runStart')).toBe('c');
+  });
+
+  // An arrow that went nowhere would be worse than no arrow at all, so a run
+  // of one hunk has no far end to offer.
+  it('has no far end to offer on a run of one hunk', () => {
+    expect(to('a', 'runEnd')).toBeNull();
+    expect(to('a', 'runStart')).toBeNull();
+  });
+
+  it('has nowhere to go at either end of the document', () => {
+    expect(to('a', 'previousRun')).toBeNull();
+    expect(to('f', 'nextRun')).toBeNull();
   });
 
   it('has nowhere to go for a hunk the change does not cover', () => {
-    expect(adjacentRun(order, hunks, '0', 'b', 'below')).toBeNull();
+    expect(to('b', 'nextRun')).toBeNull();
   });
 });

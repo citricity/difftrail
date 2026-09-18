@@ -356,10 +356,12 @@ const AI_CHANGELOG: AiChangelog = {
       ambiguous: false,
       partial: true,
     },
+    // In both changes, which makes the second one's first run two hunks long -
+    // so its end marker has somewhere to go in each direction.
     'src/lib/navigation.ts:hunk:0': {
       hunkId: 'src/lib/navigation.ts:hunk:0',
       reasons: [],
-      logicalChangeIds: ['0'],
+      logicalChangeIds: ['0', '1'],
       ambiguous: false,
       partial: false,
     },

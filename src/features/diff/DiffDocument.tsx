@@ -243,11 +243,13 @@ export function DiffDocument({
         ends={ends}
         continuesAbove={marks.continuesAbove}
         continuesBelow={marks.continuesBelow}
+        runEndBelow={marks.runEndBelow}
+        runStartAbove={marks.runStartAbove}
         labelOf={notes.labelOf}
         describe={notes.describe}
         onOpen={notes.onOpenChange}
-        onJump={(change, direction) => {
-          notes.onJumpRun(change, hunk.id, direction);
+        onJump={(change, kind) => {
+          notes.onJumpRun(change, hunk.id, kind);
         }}
       />
     );

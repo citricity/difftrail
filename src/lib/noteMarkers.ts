@@ -22,6 +22,10 @@ export interface HunkMarkers {
   continuesAbove: string[];
   /** Changes marked here that also cover a hunk further down. */
   continuesBelow: string[];
+  /** Changes whose run ends further down than the hunk marked here. */
+  runEndBelow: string[];
+  /** Changes whose run began further up than the hunk marked here. */
+  runStartAbove: string[];
 }
 
 const NONE: HunkMarkers = {
@@ -30,6 +34,8 @@ const NONE: HunkMarkers = {
   inside: [],
   continuesAbove: [],
   continuesBelow: [],
+  runEndBelow: [],
+  runStartAbove: [],
 };
 
 export function noMarkers(): HunkMarkers {
@@ -81,6 +87,8 @@ export function buildNoteMarkers(
     const inside: string[] = [];
     const continuesAbove: string[] = [];
     const continuesBelow: string[] = [];
+    const runEndBelow: string[] = [];
+    const runStartAbove: string[] = [];
 
     const here = rank.get(id);
 
@@ -94,35 +102,58 @@ export function buildNoteMarkers(
 
       if (here === undefined) continue;
       const elsewhere = reach.get(change) ?? [];
+      // A run that ends here only because the next file has not loaded is
+      // still a change with more to show, so both questions are asked of the
+      // whole diff rather than of the rows on screen.
+      const runs = runsOf(fullOrder, hunks, change);
+      const run = runs.find((covered) => covered.includes(id)) ?? [];
+      const runFirst = run[0];
+      const runLast = run[run.length - 1];
+
       if (first && elsewhere.some((position) => position < here)) {
         continuesAbove.push(change);
       }
       if (last && elsewhere.some((position) => position > here)) {
         continuesBelow.push(change);
       }
+      if (first && runLast !== undefined && runLast !== id) {
+        runEndBelow.push(change);
+      }
+      if (last && runFirst !== undefined && runFirst !== id) {
+        runStartAbove.push(change);
+      }
     }
 
-    markers.set(id, { starts, ends, inside, continuesAbove, continuesBelow });
+    markers.set(id, {
+      starts,
+      ends,
+      inside,
+      continuesAbove,
+      continuesBelow,
+      runEndBelow,
+      runStartAbove,
+    });
   });
 
   return markers;
 }
 
 /**
- * Where the change's next run starts, above or below the one this hunk is in.
+ * What a marker's arrows can take the reader to.
  *
- * A change may open and close several times, and the marker at the end of a
- * run offers to go to the next one — so this answers what that jump lands on.
- * Both directions land on the first hunk of the run, which is where a reader
- * would start reading it.
+ * From the start of a run, up leaves for the run before it and down goes to
+ * the far end of this one; from the end of a run, up goes back to where it
+ * began and down leaves for the run after. So each arrow means "the next thing
+ * worth stopping at, that way, for this change".
  */
-export function adjacentRun(
+export type RunJump = 'previousRun' | 'runStart' | 'runEnd' | 'nextRun';
+
+/** Every run of one change, in document order. */
+function runsOf(
   order: readonly string[],
   hunks: Readonly<Record<string, ResolvedHunk>>,
   change: string,
-  fromHunkId: string,
-  direction: 'above' | 'below',
-): string | null {
+): string[][] {
   const runs: string[][] = [];
   let run: string[] | null = null;
 
@@ -139,11 +170,44 @@ export function adjacentRun(
     }
   }
 
-  const at = runs.findIndex((covered) => covered.includes(fromHunkId));
+  return runs;
+}
+
+/**
+ * Where one of a marker's arrows leads, or null when it leads nowhere.
+ *
+ * A jump to another run lands on that run's first hunk, which is where a
+ * reader would start reading it. A jump within a run lands on the hunk at the
+ * far end, and answers nothing when the run is one hunk long — there is no
+ * other end to go to, and an arrow that did nothing would be worse than none.
+ */
+export function jumpTarget(
+  order: readonly string[],
+  hunks: Readonly<Record<string, ResolvedHunk>>,
+  change: string,
+  fromHunkId: string,
+  kind: RunJump,
+): string | null {
+  const runs = runsOf(order, hunks, change);
+  const at = runs.findIndex((run) => run.includes(fromHunkId));
   if (at === -1) return null;
 
-  const target = runs[direction === 'below' ? at + 1 : at - 1];
-  return target?.[0] ?? null;
+  const run = runs[at] ?? [];
+
+  switch (kind) {
+    case 'previousRun':
+      return runs[at - 1]?.[0] ?? null;
+    case 'nextRun':
+      return runs[at + 1]?.[0] ?? null;
+    case 'runStart': {
+      const first = run[0] ?? null;
+      return first === fromHunkId ? null : first;
+    }
+    case 'runEnd': {
+      const last = run[run.length - 1] ?? null;
+      return last === fromHunkId ? null : last;
+    }
+  }
 }
 
 /**

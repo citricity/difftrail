@@ -651,25 +651,38 @@
   align-items: center;
 }
 
-/* The change picks up again further down, or resumes from above. Its own
-   control, because clicking it goes there — drawn in the change's colour so it
-   belongs to the badge beside it rather than to the gutter. */
-.carriesOn {
+/* Where this change goes next, in the direction each chevron points. Stacked
+   rather than side by side: two arrows then cost one column of a gutter that
+   has none to spare, and up over down reads as the way each one travels. They
+   are drawn in the change's own colour so the pair belongs to the badge rather
+   than to the gutter. */
+.jumps {
   display: flex;
   flex: 0 0 auto;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 12px;
-  height: 15px;
+  height: 17px;
+  color: var(--note-lane);
+}
+
+.jump {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 100%;
+  min-height: 8px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 2px;
   background: transparent;
-  color: var(--note-lane);
+  color: inherit;
   cursor: pointer;
 }
 
-.carriesOn:hover {
+.jump:hover {
   background: var(--surface-hover);
 }
 

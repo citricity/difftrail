@@ -28,7 +28,7 @@ describe('a change that opens more than once', () => {
     const jump = screen.getByRole('button', { name: /next part of logical change A/ });
     await userEvent.click(jump);
 
-    expect(onJump).toHaveBeenCalledWith('0', 'below');
+    expect(onJump).toHaveBeenCalledWith('0', 'nextRun');
   });
 
   it('offers the run above from the marker that starts one', async () => {
@@ -39,18 +39,42 @@ describe('a change that opens more than once', () => {
     });
     await userEvent.click(jump);
 
-    expect(onJump).toHaveBeenCalledWith('0', 'above');
+    expect(onJump).toHaveBeenCalledWith('0', 'previousRun');
   });
 
-  // The chevron follows the marker it sits on, so a start never offers to go
-  // further down and an end never offers to go back up.
-  it('does not point the way the marker cannot go', () => {
-    badges({ starts: ['0'], continuesBelow: ['0'] });
-    expect(screen.queryByRole('button', { name: /part of logical/ })).toBeNull();
+  // Each chevron means the next stop that way for this change, which is not
+  // the same thing on a start marker as on an end one.
+  it('offers this run\'s far end from the marker at its start', async () => {
+    const { onJump } = badges({ starts: ['0'], runEndBelow: ['0'] });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /end of this part of logical change A/ }),
+    );
+
+    expect(onJump).toHaveBeenCalledWith('0', 'runEnd');
   });
 
-  it('says nothing on a change with a single run', () => {
+  it('offers the way back from the marker at its end', async () => {
+    const { onJump } = badges({ ends: ['0'], runStartAbove: ['0'] });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /start of this part of logical change A/ }),
+    );
+
+    expect(onJump).toHaveBeenCalledWith('0', 'runStart');
+  });
+
+  it('stacks both when a marker can go each way', () => {
+    badges({ ends: ['0'], continuesBelow: ['0'], runStartAbove: ['0'] });
+
+    expect(screen.getByRole('button', { name: /next part/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /start of this part/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing on a single-hunk run that stands alone', () => {
     badges({ ends: ['0'] });
-    expect(screen.queryByRole('button', { name: /part of logical/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /logical change A$/ })).toBeNull();
   });
 });

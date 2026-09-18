@@ -27,15 +27,16 @@ import { useRowMetrics } from './hooks/useRowMetrics.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import { autoWrapColumn, buildRowModel } from './lib/rows.ts';
 import {
-  adjacentRun,
   changeOfHunk,
   changesInOrder,
   documentOrder,
   fileOfHunk,
   focusFilter,
+  jumpTarget,
   labelChanges,
   stepChange,
 } from './lib/noteMarkers.ts';
+import type { RunJump } from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
 import type { Direction } from './lib/navigation.ts';
 import type { ResolvedHunk, ViewMode } from './types/index.ts';
@@ -260,17 +261,13 @@ export function App() {
       describe: changelog.describe,
       onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
       onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
-      onJumpRun: (
-        changeId: string,
-        hunkId: string,
-        direction: 'above' | 'below',
-      ) => {
-        const target = adjacentRun(
+      onJumpRun: (changeId: string, hunkId: string, kind: RunJump) => {
+        const target = jumpTarget(
           notedOrder,
           notedHunks,
           changeId,
           hunkId,
-          direction,
+          kind,
         );
         if (target === null) return;
 
