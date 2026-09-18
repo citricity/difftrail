@@ -27,7 +27,8 @@ export interface DocumentNotes {
   /** One line for a marker's tooltip. */
   describe: (change: string) => string;
   onOpenHunk: (hunkId: string) => void;
-  onOpenChange: (change: string) => void;
+  /** `hunkId` says which of the change's hunks the reader opened it from. */
+  onOpenChange: (change: string, hunkId?: string) => void;
 }
 
 export interface AiChangelogData {

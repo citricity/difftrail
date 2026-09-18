@@ -7,7 +7,6 @@ import {
   fileOfHunk,
   labelChanges,
   focusFilter,
-  changeStops,
   hunksOfChange,
   laneColour,
   stepChange,
@@ -323,30 +322,5 @@ describe('labelChanges', () => {
     expect(labels.get('1')).toBe('A');
     expect(labels.get('0')).toBe('B');
     expect(labels.get('2')).toBe('C');
-  });
-});
-
-describe('changeStops', () => {
-  const walked = {
-    a: hunk(['0']),
-    b: hunk([]),
-    c: hunk(['0']),
-    d: hunk(['0']),
-  };
-  const walkedOrder = ['a', 'b', 'c', 'd'];
-
-  // Two stops per run: a block has a top and a bottom, and one hunk can be
-  // forty lines, so a run of one still has two places to stand.
-  it('gives each run a start and an end, in document order', () => {
-    expect(changeStops(walkedOrder, walked, '0')).toEqual([
-      { hunkId: 'a', edge: 'start' },
-      { hunkId: 'a', edge: 'end' },
-      { hunkId: 'c', edge: 'start' },
-      { hunkId: 'd', edge: 'end' },
-    ]);
-  });
-
-  it('has nothing to walk for a change nothing belongs to', () => {
-    expect(changeStops(walkedOrder, walked, 'missing')).toEqual([]);
   });
 });

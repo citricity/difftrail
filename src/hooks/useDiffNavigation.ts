@@ -22,9 +22,6 @@ import {
 import type { Direction, NavigationFilter } from '../lib/navigation.ts';
 import type { ChangeLocation, DocumentFile, FileDiff } from '../types/index.ts';
 
-/** Which end of a hunk a reveal should bring into view. */
-export type RevealEdge = 'start' | 'end';
-
 export interface DiffNavigation {
   current: ChangeLocation | null;
   /** One-based position in the global sequence, for display. */
@@ -45,12 +42,9 @@ export interface DiffNavigation {
   goToFile: (fileId: string) => void;
   /**
    * Jump to one hunk, which may be in a file nobody has opened yet: the file
-   * lands at once and the hunk follows when its diff arrives. `edge` says
-   * which end of it to bring into view.
+   * lands at once and the hunk follows when its diff arrives.
    */
-  goToHunk: (fileId: string, hunkId: string, edge?: RevealEdge) => void;
-  /** Which end of `current` the last jump asked for. */
-  revealEdge: RevealEdge;
+  goToHunk: (fileId: string, hunkId: string) => void;
   /**
    * Increments whenever the view must be brought to `current` even if
    * `current` has not changed. Picking the file you are already on, after
@@ -72,7 +66,6 @@ export function useDiffNavigation(
   const [current, setCurrent] = useState<ChangeLocation | null>(null);
   const [navigating, setNavigating] = useState(false);
   const [revealRequest, setRevealRequest] = useState(0);
-  const [revealEdge, setRevealEdge] = useState<RevealEdge>('start');
 
   /**
    * Increments on every step. A load that finishes after the user has already
@@ -125,7 +118,6 @@ export function useDiffNavigation(
 
   const goTo = useCallback((location: ChangeLocation) => {
     token.current += 1;
-    setRevealEdge('start');
     setNavigating(false);
     setCurrent(location);
   }, []);
@@ -145,7 +137,6 @@ export function useDiffNavigation(
       if (file === undefined) return;
 
       const ticket = (token.current += 1);
-      setRevealEdge('start');
       setRevealRequest((previous) => previous + 1);
 
       const settled = file.status === 'loaded' || file.status === 'error';
@@ -186,12 +177,11 @@ export function useDiffNavigation(
    * have; so does a collapsed file, which has no hunk rows at all.
    */
   const goToHunk = useCallback(
-    (fileId: string, hunkId: string, edge: RevealEdge = 'start') => {
+    (fileId: string, hunkId: string) => {
       const file = files.find((candidate) => candidate.meta.id === fileId);
       if (file === undefined) return;
 
       const ticket = (token.current += 1);
-      setRevealEdge(edge);
       setRevealRequest((previous) => previous + 1);
 
       const settled = file.status === 'loaded' || file.status === 'error';
@@ -235,6 +225,5 @@ export function useDiffNavigation(
     goToFile,
     goToHunk,
     revealRequest,
-    revealEdge,
   };
 }

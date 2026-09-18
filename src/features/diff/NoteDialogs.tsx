@@ -11,7 +11,6 @@ import { ChevronDown, ChevronUp, CornerDownRight, Crosshair, X } from 'lucide-re
 import type { CSSProperties, ReactNode } from 'react';
 import type { AiChangelogView } from '../../hooks/useAiChangelog.ts';
 import { issueUrl } from '../../lib/issues.ts';
-import type { ChangeStop } from '../../lib/noteMarkers.ts';
 import {
   changesInOrder,
   fileOfHunk,
@@ -24,7 +23,7 @@ import styles from './NoteDialogs.module.css';
 /** What the reader has open, if anything. */
 export type NoteDialog =
   | { kind: 'hunk'; hunkId: string }
-  | { kind: 'change'; changeId: string; stop?: number }
+  | { kind: 'change'; changeId: string; from?: string; at?: number }
   | { kind: 'contents' }
   | null;
 
@@ -36,17 +35,16 @@ interface Props {
   onClose: () => void;
   /** Reveal a hunk in the document, and close. */
   onGoToHunk: (fileId: string, hunkId: string) => void;
-  onOpenChange: (changeId: string) => void;
+  onOpenChange: (changeId: string, hunkId?: string) => void;
   /** The change Previous/Next is currently narrowed to, if any. */
   focused?: string | null;
   onFocus?: (changeId: string) => void;
   onClearFocus?: () => void;
   /** The change the reader is in, marked in the contents list. */
   currentChange?: string | null;
-  /** How far the open change reaches, and where the reader is within it. */
-  stops?: readonly ChangeStop[];
-  stopIndex?: number;
-  /** Walk the open change, one stop at a time. */
+  /** Which of the open change's hunks the reader is on, if any. */
+  walkAt?: number;
+  /** Walk the open change, one hunk at a time. */
   onStep?: (delta: 1 | -1) => void;
 }
 
@@ -61,8 +59,7 @@ export function NoteDialogs({
   onFocus,
   onClearFocus,
   currentChange = null,
-  stops = [],
-  stopIndex = 0,
+  walkAt = -1,
   onStep,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -131,8 +128,7 @@ export function NoteDialogs({
           focused={focused === open.changeId}
           onFocus={onFocus === undefined ? undefined : () => onFocus(open.changeId)}
           onClearFocus={onClearFocus}
-          stops={stops}
-          stopIndex={stopIndex}
+          walkAt={walkAt}
           onStep={onStep}
         />
       )}
@@ -186,7 +182,7 @@ function HunkDialog({
   hunkId: string;
   notes: AiChangelogView;
   onClose: () => void;
-  onOpenChange: (changeId: string) => void;
+  onOpenChange: (changeId: string, hunkId?: string) => void;
 }) {
   const hunk = notes.hunk(hunkId);
   const changes = hunk?.logicalChangeIds ?? [];
@@ -202,6 +198,7 @@ function HunkDialog({
               <ChangeAccordion
                 key={id}
                 changeId={id}
+                hunkId={hunkId}
                 notes={notes}
                 // One change on its own has nothing to choose between, so it
                 // opens; several stay closed until the reader picks.
@@ -344,12 +341,14 @@ function ChangeAccordion({
   changeId,
   notes,
   initiallyOpen,
+  hunkId,
   onOpenChange,
 }: {
   changeId: string;
+  hunkId: string;
   notes: AiChangelogView;
   initiallyOpen: boolean;
-  onOpenChange: (changeId: string) => void;
+  onOpenChange: (changeId: string, hunkId?: string) => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const change = notes.logicalChange(changeId);
@@ -374,7 +373,7 @@ function ChangeAccordion({
           <button
             type="button"
             className={styles.jump}
-            onClick={() => onOpenChange(changeId)}
+            onClick={() => onOpenChange(changeId, hunkId)}
           >
             <CornerDownRight size={13} aria-hidden="true" />
             Go to this change
@@ -395,8 +394,7 @@ function ChangeDialog({
   focused,
   onFocus,
   onClearFocus,
-  stops,
-  stopIndex,
+  walkAt,
   onStep,
 }: {
   changeId: string;
@@ -407,8 +405,7 @@ function ChangeDialog({
   focused: boolean;
   onFocus?: () => void;
   onClearFocus?: () => void;
-  stops: readonly ChangeStop[];
-  stopIndex: number;
+  walkAt: number;
   onStep?: (delta: 1 | -1) => void;
 }) {
   const change = notes.logicalChange(changeId);
@@ -423,31 +420,36 @@ function ChangeDialog({
       <Header
         title={`Logical change ${notes.labelOf(changeId)}`}
         nav={
-          onStep === undefined || stops.length < 2 ? undefined : (
-            // The change's own stops, walked in order: the far end of the block
-            // the reader is in, then the start of the next one, and so on. The
-            // dialog stays open, so a reader can keep going.
+          onStep === undefined || hunks.length < 2 ? undefined : (
+            // The change's own hunks, walked in the order the list below shows
+            // them — so the reader can see what the next press will do. The
+            // dialog stays open, and the row it lands on is marked.
             <span className={styles.walk}>
-              <button
-                type="button"
-                className={styles.walkButton}
-                onClick={() => onStep(-1)}
-                disabled={stopIndex <= 0}
-                title="Back through this change"
-                aria-label="Back through this change"
-              >
-                <ChevronUp size={15} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className={styles.walkButton}
-                onClick={() => onStep(1)}
-                disabled={stopIndex >= stops.length - 1}
-                title="On through this change"
-                aria-label="On through this change"
-              >
-                <ChevronDown size={15} aria-hidden="true" />
-              </button>
+              <span className={styles.walkPosition}>
+                {walkAt < 0 ? '–' : walkAt + 1} / {hunks.length}
+              </span>
+              <span className={styles.walkGroup}>
+                <button
+                  type="button"
+                  className={styles.walkButton}
+                  onClick={() => onStep(-1)}
+                  disabled={walkAt <= 0}
+                  title="Back through this change"
+                  aria-label="Back through this change"
+                >
+                  <ChevronUp size={15} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={styles.walkButton}
+                  onClick={() => onStep(1)}
+                  disabled={walkAt >= hunks.length - 1}
+                  title="On through this change"
+                  aria-label="On through this change"
+                >
+                  <ChevronDown size={15} aria-hidden="true" />
+                </button>
+              </span>
             </span>
           )
         }
@@ -506,11 +508,14 @@ function ChangeDialog({
             {hunks.length} hunk{hunks.length === 1 ? '' : 's'}
           </h3>
           <ul className={styles.hunks}>
-            {hunks.map((hunkId) => (
+            {hunks.map((hunkId, index) => (
               <li key={hunkId}>
                 <button
                   type="button"
                   className={styles.hunkLink}
+                  // The row the walk is standing on, so the arrows and the list
+                  // are visibly the same control.
+                  aria-current={index === walkAt ? 'true' : undefined}
                   onClick={() => onGoTo(hunkId)}
                 >
                   {fileOfHunk(hunkId)}

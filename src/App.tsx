@@ -20,7 +20,6 @@ import { GitAliasDialog } from './features/gitAlias/GitAliasDialog.tsx';
 import { NotARepository } from './features/gitAlias/NotARepository.tsx';
 import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
-import type { RevealEdge } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
 import { useAiChangelog } from './hooks/useAiChangelog.ts';
 import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
@@ -32,12 +31,11 @@ import {
   changesInOrder,
   documentOrder,
   fileOfHunk,
-  changeStops,
   focusFilter,
+  hunksOfChange,
   labelChanges,
   stepChange,
 } from './lib/noteMarkers.ts';
-import type { ChangeStop } from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
 import type { Direction } from './lib/navigation.ts';
 import type { ResolvedHunk, ViewMode } from './types/index.ts';
@@ -186,8 +184,8 @@ export function App() {
    * lands at once and the hunk follows when its diff arrives.
    */
   const revealHunk = useCallback(
-    (hunkId: string, edge: RevealEdge = 'start') => {
-      navigation.goToHunk(fileOfHunk(hunkId), hunkId, edge);
+    (hunkId: string) => {
+      navigation.goToHunk(fileOfHunk(hunkId), hunkId);
     },
     [navigation],
   );
@@ -260,7 +258,8 @@ export function App() {
       labelOf,
       describe: changelog.describe,
       onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
-      onOpenChange: (changeId: string) => setNoteDialog({ kind: 'change', changeId }),
+      onOpenChange: (changeId: string, hunkId?: string) =>
+        setNoteDialog({ kind: 'change', changeId, from: hunkId }),
     };
   }, [changelog, labelOf]);
 
@@ -287,43 +286,46 @@ export function App() {
     focused ?? stepped ?? changeOfHunk(notedHunks, currentHunk);
 
 /**
-   * The open change's stops, and where the reader stands among them.
-   *
-   * Walking a change belongs to its dialog rather than to the gutter: there is
-   * room there to say what each direction means, and a marker is for finding
-   * your place rather than for driving from. The dialog carries the index, so
-   * it survives a jump and the reader can keep stepping.
+   * The hunks of the open change: both what its dialog lists and what its
+   * arrows walk. One list, so what the reader can see is exactly what the next
+   * press will do.
    */
-  const dialogStops = useMemo(
+  const dialogHunks = useMemo(
     () =>
       noteDialog?.kind === 'change'
-        ? changeStops(notedOrder, notedHunks, noteDialog.changeId)
-        : ([] as ChangeStop[]),
+        ? hunksOfChange(notedOrder, notedHunks, noteDialog.changeId)
+        : [],
     [noteDialog, notedOrder, notedHunks],
   );
 
-  /** Where the dialog's walk starts: the stop on the hunk the reader is on. */
-  const stopIndex =
-    noteDialog?.kind === 'change' && noteDialog.stop !== undefined
-      ? noteDialog.stop
-      : Math.max(
-          0,
-          dialogStops.findIndex((stop) => stop.hunkId === currentHunk),
+  /**
+   * Which of them the reader is on: the hunk under the cursor when the dialog
+   * opened, and after that whichever the arrows last moved to. Carried by the
+   * dialog rather than beside it, so it cannot outlive the change it counts
+   * through.
+   */
+  const dialogHunk =
+    noteDialog?.kind === 'change' && noteDialog.at !== undefined
+      ? noteDialog.at
+      : dialogHunks.indexOf(
+          (noteDialog?.kind === 'change' ? noteDialog.from : null) ??
+            currentHunk ??
+            '',
         );
 
-  const stepStop = useCallback(
+  const stepHunk = useCallback(
     (delta: 1 | -1) => {
       if (noteDialog?.kind !== 'change') return;
 
-      const next = stopIndex + delta;
-      const target = dialogStops[next];
+      const next = dialogHunk + delta;
+      const target = dialogHunks[next];
       if (target === undefined) return;
 
-      revealHunk(target.hunkId, target.edge);
+      revealHunk(target);
       setRequestedChange(noteDialog.changeId);
-      setNoteDialog({ kind: 'change', changeId: noteDialog.changeId, stop: next });
+      setNoteDialog({ kind: 'change', changeId: noteDialog.changeId, at: next });
     },
-    [dialogStops, noteDialog, revealHunk, stopIndex],
+    [dialogHunk, dialogHunks, noteDialog, revealHunk],
   );
   const changePosition = changes.findIndex((entry) => entry.id === currentChange);
 
@@ -447,7 +449,6 @@ export function App() {
         }
         current={navigation.current}
         revealRequest={navigation.revealRequest}
-        revealEdge={navigation.revealEdge}
         onSelect={navigation.goTo}
         onScrollToChange={navigation.goTo}
         onSelectFile={navigation.goToFile}
@@ -469,7 +470,7 @@ export function App() {
           order={notedOrder}
           onClose={() => setNoteDialog(null)}
           onGoToHunk={(_fileId, hunkId) => revealHunk(hunkId)}
-          onOpenChange={(changeId) => {
+          onOpenChange={(changeId: string) => {
             const entry = changes.find((candidate) => candidate.id === changeId);
             if (entry !== undefined) {
               revealHunk(entry.hunkId);
@@ -479,9 +480,8 @@ export function App() {
           }}
           focused={focused}
           currentChange={currentChange}
-          stops={dialogStops}
-          stopIndex={stopIndex}
-          onStep={stepStop}
+          walkAt={dialogHunk}
+          onStep={stepHunk}
           onFocus={(changeId) => {
             setFocused(changeId);
             setNoteDialog(null);

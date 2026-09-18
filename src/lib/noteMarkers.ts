@@ -67,61 +67,11 @@ export function buildNoteMarkers(
   return markers;
 }
 
-/** One place a change can take the reader: an end of one of its runs. */
-export interface ChangeStop {
-  hunkId: string;
-  /** Which end of that hunk to bring into view. */
-  edge: 'start' | 'end';
-}
-
-/** Every run of one change, in document order. */
-function runsOf(
-  order: readonly string[],
-  hunks: Readonly<Record<string, ResolvedHunk>>,
-  change: string,
-): string[][] {
-  const runs: string[][] = [];
-  let run: string[] | null = null;
-
-  for (const hunkId of order) {
-    if (hunks[hunkId]?.logicalChangeIds.includes(change) === true) {
-      if (run === null) {
-        run = [hunkId];
-        runs.push(run);
-      } else {
-        run.push(hunkId);
-      }
-    } else {
-      run = null;
-    }
-  }
-
-  return runs;
-}
-
-/**
- * Where a change can be walked to, top to bottom.
- *
- * Two stops per run — where it begins and where it ends — so stepping down
- * takes the reader to the end of the block they are in, then to the start of
- * the next one. A run of a single hunk still has two: one hunk can be forty
- * lines, and its two ends are two places on the screen.
- */
-export function changeStops(
-  order: readonly string[],
-  hunks: Readonly<Record<string, ResolvedHunk>>,
-  change: string,
-): ChangeStop[] {
-  return runsOf(order, hunks, change).flatMap((run) => [
-    { hunkId: run[0] ?? '', edge: 'start' as const },
-    { hunkId: run[run.length - 1] ?? '', edge: 'end' as const },
-  ]);
-}
-
 /**
  * The hunks one logical change covers, in document order.
  *
- * What the change's own modal lists, and what focusing it steps through.
+ * What the change's own dialog lists, what its arrows walk, and what focusing
+ * it steps through — one list, so the three cannot disagree.
  */
 export function hunksOfChange(
   order: readonly string[],

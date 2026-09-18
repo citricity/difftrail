@@ -477,37 +477,6 @@ export function offsetOfTarget(
 }
 
 /**
- * The bottom of a hunk's last row, for revealing the far end of a block.
- *
- * `offsetOfTarget` answers where a hunk begins, which is what a jump to a
- * change normally wants. The marker at the end of a run wants the other edge:
- * a run of one long hunk still has a top and a bottom, tens of lines apart,
- * and an arrow that took the reader to the top of the hunk they are already in
- * would look broken.
- */
-export function offsetOfHunkEnd(
-  model: RowModel,
-  hunkId: string,
-): number | null {
-  const header = model.hunkRowIndex.get(hunkId);
-  if (header === undefined) return null;
-
-  let last = header;
-  for (let index = header + 1; index < model.rows.length; index += 1) {
-    const row = model.rows[index];
-    const belongs =
-      row !== undefined &&
-      (row.kind === 'line' || row.kind === 'split-line') &&
-      row.hunkId === hunkId;
-
-    if (!belongs) break;
-    last = index;
-  }
-
-  return model.offsets[last + 1] ?? null;
-}
-
-/**
  * A key that identifies a row by what it *is* rather than where it sits.
  *
  * Row indices shift every time a file's diff arrives, so keying React on the

@@ -49,7 +49,20 @@
 .walk {
   display: flex;
   flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
   margin-left: auto;
+}
+
+.walkPosition {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: calc(var(--ui-font-size) - 1px);
+  font-variant-numeric: tabular-nums;
+}
+
+.walkGroup {
+  display: flex;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -199,6 +212,13 @@
 }
 
 .jump,
+/* Where the walk is standing. The same mark the contents list uses for the
+   change the reader is in, so the two read alike. */
+.hunkLink[aria-current='true'] {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .hunkLink {
   display: flex;
   gap: 6px;
@@ -231,6 +251,13 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Where the walk is standing. The same mark the contents list uses for the
+   change the reader is in, so the two read alike. */
+.hunkLink[aria-current='true'] {
+  background: var(--surface);
+  color: var(--text);
 }
 
 .hunkLink {
