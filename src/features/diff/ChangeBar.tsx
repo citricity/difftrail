@@ -92,7 +92,7 @@ export function ChangeBar({
           className={styles.button}
           onClick={onPrevious}
           disabled={!canGoPrevious}
-          title="Previous logical change (P)"
+          title="Previous logical change (Shift+P)"
           aria-label="Previous logical change"
         >
           <ChevronUp size={14} aria-hidden="true" />
@@ -103,7 +103,7 @@ export function ChangeBar({
           className={styles.button}
           onClick={onNext}
           disabled={!canGoNext}
-          title="Next logical change (N)"
+          title="Next logical change (Shift+N)"
           aria-label="Next logical change"
         >
           <ChevronDown size={14} aria-hidden="true" />

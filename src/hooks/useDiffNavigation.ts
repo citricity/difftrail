@@ -184,10 +184,19 @@ export function useDiffNavigation(
       const ticket = (token.current += 1);
       setRevealRequest((previous) => previous + 1);
 
+      // A settled file is not necessarily a file with this hunk in it: the
+      // load may have failed, or the diff may have been truncated short of it,
+      // and a changelog written against the whole diff knows hunks that the
+      // row model never built. Landing on the file header is a place the
+      // reader can see; a hunk id with no row is a cursor pointing at nothing.
       const settled = file.status === 'loaded' || file.status === 'error';
       if (file.collapsed || settled) {
+        const rendered =
+          !file.collapsed &&
+          (file.diff?.hunks.some((hunk) => hunk.id === hunkId) ?? false);
+
         setNavigating(false);
-        setCurrent({ fileId, hunkId: file.collapsed ? null : hunkId });
+        setCurrent({ fileId, hunkId: rendered ? hunkId : null });
         return;
       }
 

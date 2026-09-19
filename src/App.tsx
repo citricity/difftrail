@@ -470,7 +470,19 @@ export function App() {
           order={notedOrder}
           onClose={() => setNoteDialog(null)}
           onGoToHunk={(_fileId, hunkId) => revealHunk(hunkId)}
-          onOpenChange={(changeId: string) => {
+          onOpenChange={(changeId: string, hunkId?: string) => {
+            // Asked from a hunk the reader is already on, the answer is the
+            // change itself — opened at that hunk, so the walk starts where
+            // they are. Yanking them to the change's first hunk would throw
+            // away the one piece of context they had.
+            if (hunkId !== undefined) {
+              setRequestedChange(changeId);
+              setNoteDialog({ kind: 'change', changeId, from: hunkId });
+              return;
+            }
+
+            // Asked from the contents list, where no hunk is in play: the
+            // change's first hunk is the only sensible place to land.
             const entry = changes.find((candidate) => candidate.id === changeId);
             if (entry !== undefined) {
               revealHunk(entry.hunkId);

@@ -111,6 +111,25 @@ describe('the hunk dialog', () => {
     open(resolved({ reasons: [], logicalChangeIds: [] }));
     expect(screen.getByText(/No reason was recorded/)).toBeInTheDocument();
   });
+
+  it('opens a change from the hunk the reader came from, not from nowhere', async () => {
+    const hunk = resolved();
+    const onOpenChange = vi.fn();
+
+    render(
+      <NoteDialogs
+        open={{ kind: 'hunk', hunkId: hunk.hunkId }}
+        notes={view(hunk)}
+        order={[hunk.hunkId]}
+        onClose={vi.fn()}
+        onGoToHunk={vi.fn()}
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Open this change/ }));
+    expect(onOpenChange).toHaveBeenCalledWith('0', hunk.hunkId);
+  });
 });
 
 describe('the logical change dialog', () => {

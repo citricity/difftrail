@@ -383,7 +383,7 @@ function ChangeAccordion({
             onClick={() => onOpenChange(changeId, hunkId)}
           >
             <CornerDownRight size={13} aria-hidden="true" />
-            Go to this change
+            Open this change
           </button>
         </div>
       )}
