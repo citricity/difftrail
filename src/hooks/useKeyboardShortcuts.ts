@@ -6,6 +6,7 @@
  */
 
 import { useEffect } from 'react';
+import type { ZoomDirection } from '../types/index.ts';
 
 export interface Shortcuts {
   onNext: () => void;
@@ -23,6 +24,30 @@ export interface Shortcuts {
    * browser and any open dialog make of it.
    */
   onEscape?: () => void;
+  /**
+   * Scaling the whole interface, on the keys every browser uses.
+   *
+   * On macOS the View menu's own accelerators take ⌘= and ⌘− before the
+   * webview is offered them, so what actually arrives here is the shifted ⌘+,
+   * and every press on the platforms that get no menu at all.
+   */
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
+}
+
+/**
+ * Which way a key moves the zoom, if it moves it.
+ *
+ * Both the unshifted key and the character shifting it produces: ⌘+ is how the
+ * shortcut is written and ⌘= is how it is pressed, and the numeric keypad
+ * sends the signs directly.
+ */
+function zoomDirection(key: string): ZoomDirection | undefined {
+  if (key === '=' || key === '+') return 'in';
+  if (key === '-' || key === '_') return 'out';
+  if (key === '0') return 'reset';
+  return undefined;
 }
 
 /**
@@ -48,11 +73,38 @@ export function useKeyboardShortcuts({
   onNextChange,
   onPreviousChange,
   onEscape,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }: Shortcuts): void {
   useEffect(() => {
     const handle = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || isTypingTarget(event.target)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.defaultPrevented) return;
+
+      // Zoom belongs to the window rather than to the document, so it is
+      // answered ahead of the typing guard below: ⌘− while the file filter has
+      // focus means what it means everywhere else. Nothing else in here is
+      // modified, so the whole combination is spent either way.
+      if (event.metaKey || event.ctrlKey) {
+        if (event.altKey) return;
+
+        const zoom = zoomDirection(event.key);
+        const step =
+          zoom === 'in'
+            ? onZoomIn
+            : zoom === 'out'
+              ? onZoomOut
+              : zoom === 'reset'
+                ? onZoomReset
+                : undefined;
+
+        if (step === undefined) return;
+        event.preventDefault();
+        step();
+        return;
+      }
+
+      if (isTypingTarget(event.target) || event.altKey) return;
 
       if (event.key === 'Escape') {
         // The listener is on the window, so it sees Escape raised inside an
@@ -90,5 +142,14 @@ export function useKeyboardShortcuts({
 
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
-  }, [onNext, onPrevious, onNextChange, onPreviousChange, onEscape]);
+  }, [
+    onNext,
+    onPrevious,
+    onNextChange,
+    onPreviousChange,
+    onEscape,
+    onZoomIn,
+    onZoomOut,
+    onZoomReset,
+  ]);
 }

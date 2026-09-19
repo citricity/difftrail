@@ -23,7 +23,13 @@ import type {
   RepositoryInfo,
   Settings,
 } from '../types/index.ts';
-import { DEFAULT_SETTINGS, MAX_WRAP_LENGTH, MIN_WRAP_LENGTH } from '../types/index.ts';
+import {
+  DEFAULT_SETTINGS,
+  MAX_WRAP_LENGTH,
+  MAX_ZOOM,
+  MIN_WRAP_LENGTH,
+  MIN_ZOOM,
+} from '../types/index.ts';
 import iconAfter from './fixtureImages/icon-after.png';
 import iconBefore from './fixtureImages/icon-before.png';
 
@@ -455,6 +461,13 @@ async function resolveFixture(
         wrapLength: Math.min(
           MAX_WRAP_LENGTH,
           Math.max(MIN_WRAP_LENGTH, requested.wrapLength ?? settings.wrapLength),
+        ),
+        // Remembered and clamped, but nothing is scaled: outside Tauri there
+        // is no webview whose page zoom to set, and the browser's own ⌘+ is
+        // right there.
+        zoom: Math.min(
+          MAX_ZOOM,
+          Math.max(MIN_ZOOM, requested.zoom ?? settings.zoom),
         ),
       };
       return delay(settings);

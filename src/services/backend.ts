@@ -18,6 +18,7 @@ import type {
   LaunchOptions,
   RepositoryInfo,
   Settings,
+  ZoomDirection,
 } from '../types/index.ts';
 import { fixtureCall } from './fixtures.ts';
 
@@ -127,6 +128,22 @@ export function onSettingsRequested(handler: () => void): Promise<() => void> {
 /** Diff Trek > Install 'git dt' Command… */
 export function onGitAliasRequested(handler: () => void): Promise<() => void> {
   return onMenuEvent('git-alias-requested', handler);
+}
+
+/**
+ * View > Zoom In / Zoom Out / Actual Size.
+ *
+ * Carries a payload, unlike the two above: the menu says which way to move,
+ * and the levels themselves are this side's business.
+ */
+export function onZoomRequested(
+  handler: (direction: ZoomDirection) => void,
+): Promise<() => void> {
+  if (!isTauri()) return Promise.resolve(() => undefined);
+
+  return listen<ZoomDirection>('zoom-requested', (event) => {
+    handler(event.payload);
+  });
 }
 
 /**

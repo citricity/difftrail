@@ -27,6 +27,9 @@ pub fn run() {
         // to add the Settings item to.
         .setup(|app| {
             menu::install_app_items(app.handle())?;
+            // Before the window is on screen, so a scaled interface never
+            // appears at its natural size first.
+            commands::apply_stored_zoom(app.handle());
             Ok(())
         })
         // The shell knows the item was chosen; only the webview knows what the
@@ -36,6 +39,8 @@ pub fn run() {
                 let _ = app.emit(menu::SETTINGS_EVENT, ());
             } else if event.id() == menu::GIT_ALIAS_ID {
                 let _ = app.emit(menu::GIT_ALIAS_EVENT, ());
+            } else if let Some(direction) = menu::zoom_direction(event.id()) {
+                let _ = app.emit(menu::ZOOM_EVENT, direction);
             }
         })
         .invoke_handler(tauri::generate_handler![

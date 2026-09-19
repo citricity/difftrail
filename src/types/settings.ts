@@ -21,6 +21,14 @@ export type ViewMode = 'unified' | 'split';
  */
 export type WrapMode = 'off' | 'column' | 'auto';
 
+/**
+ * Which way a zoom command moves the interface.
+ *
+ * Also the payload the View menu sends the webview: the shell knows an item
+ * was chosen, and this side knows what the levels are.
+ */
+export type ZoomDirection = 'in' | 'out' | 'reset';
+
 export interface Settings {
   /** Whether long lines wrap rather than scrolling horizontally, and where. */
   wrap: WrapMode;
@@ -34,6 +42,14 @@ export interface Settings {
    * toolbar switches the view for the session without disturbing this.
    */
   defaultViewMode: ViewMode;
+  /**
+   * How far the whole interface is scaled, as a percentage of its natural
+   * size — the code, the chrome, the icons and the borders alike.
+   *
+   * Storing it is what applies it: the backend hands it to the webview's page
+   * zoom, so nothing on this side scales anything itself.
+   */
+  zoom: number;
 }
 
 /**
@@ -44,8 +60,13 @@ export const DEFAULT_SETTINGS: Settings = {
   wrap: 'off',
   wrapLength: 120,
   defaultViewMode: 'unified',
+  zoom: 100,
 };
 
 /** The range the backend will accept; the dialog holds the input to it too. */
 export const MIN_WRAP_LENGTH = 40;
 export const MAX_WRAP_LENGTH = 1000;
+
+/** The same for the zoom level, in per cent. The ladder spans exactly this. */
+export const MIN_ZOOM = 50;
+export const MAX_ZOOM = 300;
