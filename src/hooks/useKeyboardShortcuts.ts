@@ -30,6 +30,10 @@ export interface Shortcuts {
    * On macOS the View menu's own accelerators take ⌘= and ⌘− before the
    * webview is offered them, so what actually arrives here is the shifted ⌘+,
    * and every press on the platforms that get no menu at all.
+   *
+   * Left undefined where the app cannot scale itself — running in a plain
+   * browser, say — because the combination then has to reach the browser's
+   * own zoom rather than being swallowed by a handler that does nothing.
    */
   onZoomIn?: () => void;
   onZoomOut?: () => void;
