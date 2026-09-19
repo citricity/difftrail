@@ -332,7 +332,8 @@ const AI_CHANGELOG: AiChangelog = {
     },
     {
       id: '1',
-      description: 'Warm the diff colours slightly for dark mode.',
+      description:
+        'Retire the hand-measured scrolling, in the row model and in the module it left behind.',
       associatedIssues: [],
     },
   ],
@@ -351,14 +352,27 @@ const AI_CHANGELOG: AiChangelog = {
       reasons: [
         'Keeps the reader in place: the scroll position is anchored to a row key, not to a pixel offset that the rebuild invalidates.',
       ],
-      logicalChangeIds: ['0'],
+      logicalChangeIds: ['0', '1'],
       ambiguous: false,
       partial: true,
     },
+    // In both changes, which makes the second one's first run two hunks long -
+    // so its end marker has somewhere to go in each direction.
     'src/lib/navigation.ts:hunk:0': {
       hunkId: 'src/lib/navigation.ts:hunk:0',
       reasons: [],
-      logicalChangeIds: ['0'],
+      logicalChangeIds: ['0', '1'],
+      ambiguous: false,
+      partial: false,
+    },
+    // Two files apart from its other hunk, so the sample shows a change that
+    // opens twice — and the chevron that says so on the marker between them.
+    'src/legacy/removed.ts:hunk:0': {
+      hunkId: 'src/legacy/removed.ts:hunk:0',
+      reasons: [
+        'Nothing measured the DOM any more, so the module had no callers left.',
+      ],
+      logicalChangeIds: ['1'],
       ambiguous: false,
       partial: false,
     },
@@ -371,8 +385,8 @@ const AI_CHANGELOG: AiChangelog = {
     },
   },
   summary: {
-    matched: 4,
-    total: 5,
+    matched: 5,
+    total: 6,
     unexplained: 1,
     partial: 1,
     staleNotes: 1,

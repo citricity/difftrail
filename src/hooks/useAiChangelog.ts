@@ -15,13 +15,40 @@ export type HunkNoteState =
   | 'unexplained'
   | 'changedSince';
 
-export interface AiChangelogView {
+/**
+ * What `DiffDocument` needs to draw the markers: the resolved notes, the
+ * labels, and what to do when one is clicked. Assembled by `App`, so the
+ * document itself knows nothing about dialogs.
+ */
+export interface DocumentNotes {
+  hunks: Record<string, ResolvedHunk>;
+  state: (hunkId: string) => HunkNoteState;
+  labelOf: (change: string) => string;
+  /** One line for a marker's tooltip. */
+  describe: (change: string) => string;
+  onOpenHunk: (hunkId: string) => void;
+  /** `hunkId` says which of the change's hunks the reader opened it from. */
+  onOpenChange: (change: string, hunkId?: string) => void;
+}
+
+export interface AiChangelogData {
   changelog: AiChangelog | null;
   /** The notes for one hunk, or null when the changelog never saw it. */
   hunk: (hunkId: string) => ResolvedHunk | null;
   state: (hunkId: string) => HunkNoteState;
   logicalChange: (id: string) => LogicalChange | null;
-  /** Display order of the logical changes, for labels and colours. */
+  /** The change's description, for a marker's tooltip. */
+  describe: (id: string) => string;
+}
+
+/**
+ * The changelog as the UI reads it.
+ *
+ * `labelOf` is supplied by the composition root rather than by the hook: a
+ * label is a position in the document, and only the caller knows what the
+ * document is showing and in what order.
+ */
+export interface AiChangelogView extends AiChangelogData {
   labelOf: (id: string) => string;
 }
 
@@ -35,7 +62,7 @@ const EMPTY: AiChangelog | null = null;
  * than a silent reload — which would replace the notes a reader was in the
  * middle of without telling them.
  */
-export function useAiChangelog(ready: boolean): AiChangelogView & {
+export function useAiChangelog(ready: boolean): AiChangelogData & {
   reload: () => void;
 } {
   const [changelog, setChangelog] = useState<AiChangelog | null>(EMPTY);
@@ -62,15 +89,6 @@ export function useAiChangelog(ready: boolean): AiChangelogView & {
     };
   }, [ready, attempt]);
 
-  /** `A`, `B`, `C`… so a marker is readable without relying on its colour. */
-  const labels = useMemo(() => {
-    const assigned = new Map<string, string>();
-    changelog?.logicalChanges.forEach((change, index) => {
-      assigned.set(change.id, String.fromCharCode(65 + (index % 26)));
-    });
-    return assigned;
-  }, [changelog]);
-
   const hunk = useCallback(
     (hunkId: string) => changelog?.hunks[hunkId] ?? null,
     [changelog],
@@ -94,11 +112,22 @@ export function useAiChangelog(ready: boolean): AiChangelogView & {
     [changelog],
   );
 
-  const labelOf = useCallback((id: string) => labels.get(id) ?? '?', [labels]);
+  const describe = useCallback(
+    (id: string) => logicalChange(id)?.description ?? 'Logical change',
+    [logicalChange],
+  );
 
   const reload = useCallback(() => {
     setAttempt((value) => value + 1);
   }, []);
 
-  return { changelog, hunk, state, logicalChange, labelOf, reload };
+  /**
+   * Memoised, because consumers hang memos off this object: App derives the
+   * change list, the document's notes and the navigation filter from it, and a
+   * fresh literal every render would rebuild all three on every keystroke.
+   */
+  return useMemo(
+    () => ({ changelog, hunk, state, logicalChange, describe, reload }),
+    [changelog, hunk, state, logicalChange, describe, reload],
+  );
 }

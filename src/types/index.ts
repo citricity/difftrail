@@ -21,7 +21,7 @@ export type {
   MatchSummary,
   ResolvedHunk,
 } from './aiChangelog.ts';
-export { changedSince, isComplete } from './aiChangelog.ts';
+export { changedSince, explained, isComplete } from './aiChangelog.ts';
 
 export type { GitAliasStatus } from './gitAlias.ts';
 export type { LaunchOptions } from './launch.ts';

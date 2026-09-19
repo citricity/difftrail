@@ -71,6 +71,14 @@ export function isComplete(summary: MatchSummary): boolean {
 }
 
 /**
+ * Hunks the changelog actually explains: the ones it matched, less the ones it
+ * matched and then said nothing about.
+ */
+export function explained(summary: MatchSummary): number {
+  return summary.matched - summary.unexplained;
+}
+
+/**
  * Hunks that changed after the notes were written — usually the reader's own
  * later edits, which is why they are never called unexplained.
  */

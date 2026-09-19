@@ -215,19 +215,41 @@ hunks=$(printf '%s\n' "$diff" | grep -c '^@@ ' || true)
 printf '%s/%s\n\n' "$root" "$path"
 
 cat <<INSTRUCTIONS
-$hunks hunk(s) to explain. Fill in each placeholder:
+$hunks hunk(s) to explain.
+
+1. Give every hunk a reason. Fill in each placeholder with why that hunk
+   exists — not what it does, the diff shows that:
 
     $MARKER:$nonce:HUNK_REASON id=hN~~
-    why this hunk exists — not what it does, the diff shows that
+    why this hunk exists
     $MARKER:$nonce:/HUNK_REASON id=hN~~
 
-Group the hunks belonging to one intent by wrapping them in
-    $MARKER:$nonce:LOGICAL_CHANGE_START id=0 /~~ … $MARKER:$nonce:LOGICAL_CHANGE_END id=0 /~~
-and describe each id in the LOGICAL_CHANGE_TABLE block. A span may open
-and close more than once, which is how one intent covers hunks 1 and 3
-but not 2, and how it gets markers in each file it touches.
+2. Put every hunk inside at least one logical change — one intent, covering
+   however many hunks serve it:
 
-Edit only inside the tag blocks. Never retype the diff — one altered
-space unmatches a hunk and loses its note — and do not quote a live
-$nonce tag inside a reason, which would end the block early.
+    $MARKER:$nonce:LOGICAL_CHANGE_START id=0 /~~
+    … the hunks that serve it …
+    $MARKER:$nonce:LOGICAL_CHANGE_END id=0 /~~
+
+   A hunk joins whichever spans are open when its @@ line is read, so open a
+   span above an @@ line and close it after the last line of the hunk it
+   ends. A span may open and close more than once, which is how one intent
+   covers hunks 1 and 3 but not 2, and how it gets its own markers in each
+   file it touches. Spans may overlap, so a hunk can serve two intents.
+
+   Leave no hunk outside every span. A hunk that shares its intent with no
+   other hunk still gets a span of its own, and unrelated hunks are never
+   grouped together to avoid one.
+
+3. Describe every id you opened in the LOGICAL_CHANGE_TABLE block:
+
+    [{"id": "0", "description": "…", "associatedIssues": []}]
+
+   The description is a headline: one sentence saying what the change sets
+   out to do, short enough to read in a list. The reasoning belongs in the
+   hunk reasons, not here.
+
+Edit only inside the tag blocks. Never retype the diff — one altered space
+unmatches a hunk and loses its note — and do not quote a live $nonce tag
+inside a reason, which would end the block early.
 INSTRUCTIONS

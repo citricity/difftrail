@@ -190,7 +190,6 @@
 
 .hunk {
   height: var(--row-height);
-  padding-left: 12px;
   overflow: hidden;
   background: var(--hunk-bg);
   border-top: 1px solid var(--border-subtle);
@@ -204,6 +203,7 @@
 }
 
 .hunkRange {
+  padding-left: 12px;
   color: var(--text-faint);
 }
 
@@ -579,4 +579,112 @@
 .endDetail {
   margin: 0;
   color: var(--text-muted);
+}
+
+/* ---- AI changelog markers ------------------------------------------ */
+
+/* The notes column, inside the gutter and left of the line numbers. It is
+   `--notes-width` wide on every row — including rows with nothing to show — so
+   the line numbers stay in one column down the whole document. Width is zero
+   until a changelog is loaded, which is what keeps the gutter unchanged for
+   everyone who has never written one. */
+.notes {
+  display: flex;
+  flex: 0 0 var(--notes-width);
+  align-items: center;
+  overflow: hidden;
+  padding-left: 2px;
+}
+
+/* The badges' half of the column. Fixed, so a hunk's icon sits at the same x
+   on every row whether or not a logical change starts beside it. */
+.lane {
+  display: flex;
+  flex: 0 0 var(--notes-lane);
+  gap: 2px;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* A logical change: filled where its run of hunks starts, hollow where it
+   ends. That pairing is the whole grammar — there is no connecting line down
+   the gutter, which would fight the code for attention. The letter is what
+   identifies the change; colour alone would fail a reader who cannot tell
+   these apart. */
+.badge {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 2px;
+  border: 1px solid var(--note-lane);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.starts {
+  background: var(--note-lane);
+  color: var(--note-badge-text);
+}
+
+.ends {
+  background: transparent;
+  color: var(--note-lane);
+}
+
+/* The change's own colour, lightened. An outline or a grey wash would say
+   "some control", where this says "this change" — which is what the reader is
+   tracking down the gutter. */
+.badge:hover {
+  filter: brightness(1.25);
+}
+
+/* More changes meet here than the column can show. */
+.more {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+  font-size: 9px;
+}
+
+/* The hunk's own note, on its `@@` row. */
+.hunkNote {
+  display: flex;
+  position: relative;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  /* Set per icon: its logical change's lane, the accent for a reason that
+     belongs to no change, or amber for a hunk nobody explained. */
+  color: var(--note-colour, var(--text-muted));
+  cursor: pointer;
+}
+
+.hunkNote:hover {
+  background: var(--surface-hover);
+}
+
+/* The note covers part of what this hunk now does: something was edited
+   alongside it after the note was written. */
+.partial {
+  position: absolute;
+  top: -2px;
+  right: -1px;
+  color: var(--note-unexplained);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }

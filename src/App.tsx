@@ -8,7 +8,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StartupError } from './components/StartupError.tsx';
+import { ChangeBar } from './features/diff/ChangeBar.tsx';
 import { DiffDocument } from './features/diff/DiffDocument.tsx';
+import { NoteDialogs } from './features/diff/NoteDialogs.tsx';
+import { NoteStatus } from './features/diff/NoteStatus.tsx';
+import type { NoteDialog } from './features/diff/NoteDialogs.tsx';
 import { NavigationControls } from './features/navigation/NavigationControls.tsx';
 import { ViewModeToggle } from './features/navigation/ViewModeToggle.tsx';
 import { RepositoryHeader } from './features/repository/RepositoryHeader.tsx';
@@ -17,12 +21,24 @@ import { NotARepository } from './features/gitAlias/NotARepository.tsx';
 import { SettingsDialog } from './features/settings/SettingsDialog.tsx';
 import { useDiffNavigation } from './hooks/useDiffNavigation.ts';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
+import { useAiChangelog } from './hooks/useAiChangelog.ts';
 import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
 import { useRowMetrics } from './hooks/useRowMetrics.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import { autoWrapColumn, buildRowModel } from './lib/rows.ts';
+import {
+  changeOfHunk,
+  changesInOrder,
+  documentOrder,
+  fileOfHunk,
+  focusFilter,
+  hunksOfChange,
+  labelChanges,
+  stepChange,
+} from './lib/noteMarkers.ts';
 import { throttle } from './lib/throttle.ts';
-import type { ViewMode } from './types/index.ts';
+import type { Direction } from './lib/navigation.ts';
+import type { ResolvedHunk, ViewMode } from './types/index.ts';
 import styles from './App.module.css';
 
 /**
@@ -35,6 +51,9 @@ import styles from './App.module.css';
  */
 const RESIZE_THROTTLE_MS = 100;
 
+/** One empty object, so a diff with no changelog does not churn the memos. */
+const NO_HUNKS: Readonly<Record<string, ResolvedHunk>> = {};
+
 export function App() {
   const {
     state,
@@ -46,7 +65,32 @@ export function App() {
     revealContext,
   } = useRepositoryDiff();
 
-  const metrics = useRowMetrics();
+  /**
+   * The AI changelog for what is on screen, if an agent wrote one.
+   *
+   * Loaded once the file list is in, because a changelog describes a diff and
+   * there is nothing to describe before that — and not at all when startup
+   * failed, where asking would only add a second error to the first.
+   */
+  const changelog = useAiChangelog(state.phase === 'ready');
+  const hasNotes = changelog.changelog !== null;
+
+  /**
+   * The markers need room in the gutter, and auto wrapping reads the gutter's
+   * width from the document root — so the flag lives there rather than on a
+   * container, and the metrics are re-measured when it changes.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (hasNotes) root.dataset.aiChangelog = 'true';
+    else delete root.dataset.aiChangelog;
+
+    return () => {
+      delete root.dataset.aiChangelog;
+    };
+  }, [hasNotes]);
+
+  const metrics = useRowMetrics(hasNotes);
   const settingsState = useSettings();
   const { wrap, wrapLength } = settingsState.settings;
 
@@ -106,11 +150,232 @@ export function App() {
     [state.files, metrics, wrapColumn, viewMode],
   );
 
-  const navigation = useDiffNavigation(state.files, ensureLoaded);
+  /**
+   * The logical change the reader has narrowed to, if any.
+   *
+   * Focus changes the sequence, not the document: every hunk stays on screen,
+   * and only Previous/Next, the readout and following the scroll are narrowed.
+   */
+  const [requestedFocus, setFocused] = useState<string | null>(null);
+
+  /**
+   * Derived rather than stored, so a changelog that no longer mentions the
+   * focused change lets the focus lapse by itself — correcting it in an effect
+   * would mean a render with the reader stepping through an empty sequence.
+   */
+  const focused =
+    requestedFocus !== null && changelog.logicalChange(requestedFocus) !== null
+      ? requestedFocus
+      : null;
+
+  const navigationFilter = useMemo(() => {
+    const hunks = changelog.changelog?.hunks;
+    if (focused === null || hunks === undefined) return undefined;
+    return focusFilter(hunks, focused);
+  }, [focused, changelog]);
+
+  const navigation = useDiffNavigation(state.files, ensureLoaded, navigationFilter);
+
+  /** Which note dialog is open, if any. */
+  const [noteDialog, setNoteDialog] = useState<NoteDialog>(null);
+
+  /**
+   * Reveals a hunk that may be in a file nobody has opened yet — the file
+   * lands at once and the hunk follows when its diff arrives.
+   */
+  const revealHunk = useCallback(
+    (hunkId: string) => {
+      navigation.goToHunk(fileOfHunk(hunkId), hunkId);
+    },
+    [navigation],
+  );
+
+
+  /**
+   * The logical changes with a hunk on screen, and where the reader sits among
+   * them.
+   *
+   * The current change follows the hunk cursor rather than being stored, so
+   * stepping hunks and stepping changes can never disagree about where the
+   * reader is. While focused it is the focused change: a hunk serving two
+   * intents would otherwise rename the bar out from under the narrowing.
+   */
+  const notedHunks = changelog.changelog?.hunks ?? NO_HUNKS;
+
+  /**
+   * Every hunk the changelog knows, in document order — including those in
+   * files whose diffs have not been read yet, so the counter does not climb
+   * as the reader scrolls.
+   */
+  const fileOrder = useMemo(
+    () => state.files.map((file) => file.meta.id),
+    [state.files],
+  );
+
+  const notedOrder = useMemo(
+    () => documentOrder(fileOrder, notedHunks),
+    [fileOrder, notedHunks],
+  );
+
+  const changes = useMemo(
+    () => changesInOrder(notedOrder, notedHunks),
+    [notedOrder, notedHunks],
+  );
+
+  /**
+   * A, B, C… in the order the changes first appear on screen.
+   *
+   * Assigned here rather than in the hook, because a label is a position in
+   * the document: taking them from the changelog's table instead would open a
+   * diff whose first marker is B.
+   */
+  const labels = useMemo(
+    () =>
+      labelChanges(
+        changes,
+        changelog.changelog?.logicalChanges.map((change) => change.id) ?? [],
+      ),
+    [changes, changelog],
+  );
+
+  const labelOf = useCallback(
+    (id: string) => labels.get(id) ?? '?',
+    [labels],
+  );
+
+  /** The changelog as everything below reads it, labels included. */
+  const notes = useMemo(
+    () => ({ ...changelog, labelOf }),
+    [changelog, labelOf],
+  );
+
+  const documentNotes = useMemo(() => {
+    if (changelog.changelog === null) return null;
+
+    return {
+      hunks: changelog.changelog.hunks,
+      state: changelog.state,
+      labelOf,
+      describe: changelog.describe,
+      onOpenHunk: (hunkId: string) => setNoteDialog({ kind: 'hunk', hunkId }),
+      onOpenChange: (changeId: string, hunkId?: string) =>
+        setNoteDialog({ kind: 'change', changeId, from: hunkId }),
+    };
+  }, [changelog, labelOf]);
+
+  const currentHunk = navigation.current?.hunkId ?? null;
+
+  /**
+   * The change the reader stepped to, which only the reader can say.
+   *
+   * A hunk may serve two intents, and the hunk cannot name which of them is
+   * being read — so stepping onto a shared hunk would otherwise be read back as
+   * the first of its changes, and the second would be unreachable. Kept only
+   * while it still covers the hunk in view: scroll away and the bar goes back
+   * to naming what is under the cursor.
+   */
+  const [requestedChange, setRequestedChange] = useState<string | null>(null);
+  const hunkChanges =
+    currentHunk === null ? undefined : notedHunks[currentHunk]?.logicalChangeIds;
+  const stepped =
+    requestedChange !== null && (hunkChanges?.includes(requestedChange) ?? false)
+      ? requestedChange
+      : null;
+
+  const currentChange =
+    focused ?? stepped ?? changeOfHunk(notedHunks, currentHunk);
+
+/**
+   * The hunks of the open change: both what its dialog lists and what its
+   * arrows walk. One list, so what the reader can see is exactly what the next
+   * press will do.
+   */
+  const dialogHunks = useMemo(
+    () =>
+      noteDialog?.kind === 'change'
+        ? hunksOfChange(notedOrder, notedHunks, noteDialog.changeId)
+        : [],
+    [noteDialog, notedOrder, notedHunks],
+  );
+
+  /**
+   * Which of them the reader is on: the hunk under the cursor when the dialog
+   * opened, and after that whichever the arrows last moved to. Carried by the
+   * dialog rather than beside it, so it cannot outlive the change it counts
+   * through.
+   */
+  const dialogHunk =
+    noteDialog?.kind === 'change' && noteDialog.at !== undefined
+      ? noteDialog.at
+      : dialogHunks.indexOf(
+          (noteDialog?.kind === 'change' ? noteDialog.from : null) ??
+            currentHunk ??
+            '',
+        );
+
+  const stepHunk = useCallback(
+    (delta: 1 | -1) => {
+      if (noteDialog?.kind !== 'change') return;
+
+      const next = dialogHunk + delta;
+      const target = dialogHunks[next];
+      if (target === undefined) return;
+
+      revealHunk(target);
+      setRequestedChange(noteDialog.changeId);
+      setNoteDialog({ kind: 'change', changeId: noteDialog.changeId, at: next });
+    },
+    [dialogHunk, dialogHunks, noteDialog, revealHunk],
+  );
+  const changePosition = changes.findIndex((entry) => entry.id === currentChange);
+
+  const nextChange = stepChange(
+    changes,
+    notedOrder,
+    fileOrder,
+    navigation.current,
+    currentChange,
+    'next',
+  );
+  const previousChange = stepChange(
+    changes,
+    notedOrder,
+    fileOrder,
+    navigation.current,
+    currentChange,
+    'previous',
+  );
+
+
+  /**
+   * Stepping while focused moves the focus with it, so the arrows read as
+   * "the next intent, on its own" rather than silently stepping out of the
+   * narrowing the reader asked for.
+   */
+  const goToChange = useCallback(
+    (direction: Direction) => {
+      const target = direction === 'next' ? nextChange : previousChange;
+      if (target === null) return;
+
+      revealHunk(target.hunkId);
+      setRequestedChange(target.id);
+      if (focused !== null) setFocused(target.id);
+    },
+    [focused, nextChange, previousChange, revealHunk],
+  );
+
+  const goToNextChange = useCallback(() => goToChange('next'), [goToChange]);
+  const goToPreviousChange = useCallback(
+    () => goToChange('previous'),
+    [goToChange],
+  );
 
   useKeyboardShortcuts({
     onNext: navigation.goNext,
     onPrevious: navigation.goPrevious,
+    onNextChange: changes.length === 0 ? undefined : goToNextChange,
+    onPreviousChange: changes.length === 0 ? undefined : goToPreviousChange,
+    onEscape: focused === null ? undefined : () => setFocused(null),
   });
 
   const handleLoadFully = useCallback(
@@ -143,10 +408,34 @@ export function App() {
       <header className={styles.toolbar}>
         <RepositoryHeader repository={state.repository} summary={summary} />
         <NavigationControls navigation={navigation} />
+        {changelog.changelog !== null && (
+          <NoteStatus summary={changelog.changelog.summary} />
+        )}
         <ViewModeToggle value={viewMode} onChange={chooseViewMode} />
         <SettingsDialog state={settingsState} />
         <GitAliasDialog />
       </header>
+
+      {changes.length > 0 && (
+        <ChangeBar
+          label={currentChange === null ? null : labelOf(currentChange)}
+          description={
+            currentChange === null ? null : changelog.describe(currentChange)
+          }
+          position={changePosition === -1 ? null : changePosition + 1}
+          total={changes.length}
+          onHunk={currentHunk !== null}
+          focused={focused !== null}
+          canGoNext={nextChange !== null}
+          canGoPrevious={previousChange !== null}
+          onOpenContents={() => setNoteDialog({ kind: 'contents' })}
+          onNext={goToNextChange}
+          onPrevious={goToPreviousChange}
+          onToggleFocus={() =>
+            setFocused(focused === null ? currentChange : null)
+          }
+        />
+      )}
 
       <DiffDocument
         files={state.files}
@@ -170,7 +459,51 @@ export function App() {
         wrapColumn={wrapColumn}
         viewMode={viewMode}
         onViewportWidthChange={reportViewportWidth}
+        notes={documentNotes}
+        navigationFilter={navigationFilter}
       />
+
+      {changelog.changelog !== null && (
+        <NoteDialogs
+          open={noteDialog}
+          notes={notes}
+          order={notedOrder}
+          onClose={() => setNoteDialog(null)}
+          onGoToHunk={(_fileId, hunkId) => revealHunk(hunkId)}
+          onOpenChange={(changeId: string, hunkId?: string) => {
+            // Asked from a hunk the reader is already on, the answer is the
+            // change itself — opened at that hunk, so the walk starts where
+            // they are. Yanking them to the change's first hunk would throw
+            // away the one piece of context they had.
+            if (hunkId !== undefined) {
+              setRequestedChange(changeId);
+              setNoteDialog({ kind: 'change', changeId, from: hunkId });
+              return;
+            }
+
+            // Asked from the contents list, where no hunk is in play: the
+            // change's first hunk is the only sensible place to land.
+            const entry = changes.find((candidate) => candidate.id === changeId);
+            if (entry !== undefined) {
+              revealHunk(entry.hunkId);
+              setRequestedChange(changeId);
+            }
+            setNoteDialog(null);
+          }}
+          focused={focused}
+          currentChange={currentChange}
+          walkAt={dialogHunk}
+          onStep={stepHunk}
+          onFocus={(changeId) => {
+            setFocused(changeId);
+            setNoteDialog(null);
+          }}
+          onClearFocus={() => {
+            setFocused(null);
+            setNoteDialog(null);
+          }}
+        />
+      )}
     </div>
   );
 }

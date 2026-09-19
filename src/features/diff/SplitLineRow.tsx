@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { DiffLine } from '../../types/index.ts';
 import type { LineRun } from '../../lib/runs.ts';
 import { wrapRuns } from '../../lib/wrap.ts';
@@ -27,6 +27,16 @@ interface Props {
    */
   offset: number;
   active: boolean;
+  /**
+   * Logical change markers for this line, drawn once per row rather than once
+   * per pane: the old side carries them, or the new side when the row has no
+   * old line at all. An absent pane renders no gutter, so leaving them with the
+   * old side unconditionally loses every marker on an addition.
+   *
+   * The column itself is drawn in both panes regardless, because the two must
+   * stay the same width for the wrap column they share to mean anything.
+   */
+  notes?: ReactNode;
   /** Absolute position within the document canvas, set by the virtualiser. */
   style: CSSProperties;
 }
@@ -36,11 +46,13 @@ function Pane({
   entry,
   wrapColumn,
   offset,
+  notes,
 }: {
   side: 'left' | 'right';
   entry: PaneLine | null;
   wrapColumn: number | null;
   offset: number;
+  notes?: ReactNode;
 }) {
   if (entry === null) {
     // Not "empty" but "absent": there is no line here to face the other side,
@@ -63,9 +75,13 @@ function Pane({
     <span className={`${styles.pane} ${styles[line.kind]}`} data-side={side}>
       {wrapped.map((rowRuns, index) => (
         <span key={index} className={styles.visualLine}>
-          <span className={styles.gutter} aria-hidden="true">
-            <span className={styles.number}>{index === 0 ? (number ?? '') : ''}</span>
+          <span className={styles.gutter}>
+            <span className={styles.notes}>
+              <span className={styles.lane}>{index === 0 ? notes : null}</span>
+            </span>
+            <span className={styles.number} aria-hidden="true">{index === 0 ? (number ?? '') : ''}</span>
             <span
+              aria-hidden="true"
               className={
                 index === 0 ? styles.marker : `${styles.marker} ${styles.continuation}`
               }
@@ -119,16 +135,36 @@ function Pane({
  * its own wrapping, the same colours — and the row is as tall as the taller of
  * the two, so the sides keep a common baseline.
  */
-function SplitLineRowImpl({ left, right, wrapColumn, offset, active, style }: Props) {
+function SplitLineRowImpl({
+  left,
+  right,
+  wrapColumn,
+  offset,
+  active,
+  notes,
+  style,
+}: Props) {
   const className = [styles.row, styles.splitRow, active ? styles.active : '']
     .filter(Boolean)
     .join(' ');
 
   return (
     <div className={className} style={style} role="row" data-row="split">
-      <Pane side="left" entry={left} wrapColumn={wrapColumn} offset={offset} />
+      <Pane
+        side="left"
+        entry={left}
+        wrapColumn={wrapColumn}
+        offset={offset}
+        notes={left === null ? undefined : notes}
+      />
       <span className={styles.paneDivider} aria-hidden="true" />
-      <Pane side="right" entry={right} wrapColumn={wrapColumn} offset={offset} />
+      <Pane
+        side="right"
+        entry={right}
+        wrapColumn={wrapColumn}
+        offset={offset}
+        notes={left === null ? notes : undefined}
+      />
     </div>
   );
 }

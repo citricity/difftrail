@@ -101,7 +101,10 @@ pub struct LogicalChange {
     pub id: String,
     #[serde(default)]
     pub description: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Always serialised, even when empty. This struct is both the file format
+    /// and the payload the UI receives, and skipping an empty list would hand
+    /// the frontend `undefined` where it expects an array - which it indexes.
+    #[serde(default)]
     pub associated_issues: Vec<String>,
 }
 
@@ -779,6 +782,21 @@ mod tests {
         let second = &changelog.notes[1];
         assert!(second.logical_change_ids.is_empty());
         assert!(second.is_unexplained());
+    }
+
+    /// A change with no issues still carries the field. The UI reads
+    /// `associatedIssues.length`, so an omitted array is not a tidier payload -
+    /// it is a blank window the moment someone opens that change.
+    #[test]
+    fn an_empty_issue_list_is_still_serialised() {
+        let change = LogicalChange {
+            id: "0".into(),
+            description: "Reset the error count".into(),
+            associated_issues: Vec::new(),
+        };
+
+        let json = serde_json::to_string(&change).unwrap();
+        assert!(json.contains("\"associatedIssues\":[]"), "{json}");
     }
 
     #[test]

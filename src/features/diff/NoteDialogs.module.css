@@ -1,0 +1,438 @@
+/* The contents list is as long as the diff has intents, so the dialog is
+   capped and its body scrolls: a list taller than the window would otherwise
+   carry the close button off the bottom of it. */
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+
+.header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+/* Walking the change, in the dialog's own header: a pair of steppers between
+   the title and the close, sized like the toolbar's rather than like a gutter
+   mark, because here there is room to hit them. */
+.walk {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.walkPosition {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: calc(var(--ui-font-size) - 1px);
+  font-variant-numeric: tabular-nums;
+}
+
+.walkGroup {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.walkButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  cursor: default;
+}
+
+.walkButton + .walkButton {
+  border-left: 1px solid var(--border);
+}
+
+.walkButton:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.walkButton:disabled {
+  color: var(--text-faint);
+}
+
+.close {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* A hunk that has grown around its note, or identical hunks given different
+   reasons: the reader is told what is being claimed and what is not. */
+.warning {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.warning span {
+  color: var(--note-unexplained);
+  font-weight: 700;
+}
+
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.accordion {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.summary:hover {
+  background: var(--surface-hover);
+}
+
+/* Every letter in these dialogs is drawn in its change's own colour, the way
+   the gutter draws it: the letter is what identifies a change, and it should
+   not change colour depending on which window the reader is looking at. */
+.label {
+  flex: 0 0 auto;
+  min-width: 15px;
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--note-lane);
+  color: var(--note-badge-text);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* The file-path title reads right to left so a long path truncates from its
+   start; a change's title is ordinary text and must not. */
+.changeTitle {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  direction: ltr;
+}
+
+.titleLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  background: var(--note-lane);
+  color: var(--note-badge-text);
+}
+
+/* Collapsed: one line, cut off. The whole point of the accordion is that the
+   same intent repeats across hunks and the reader has usually read it. */
+.oneLine {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fullLine {
+  line-height: 1.45;
+}
+
+.accordionBody {
+  padding: 0 9px 9px;
+}
+
+.jump,
+/* Where the walk is standing. The same mark the contents list uses for the
+   change the reader is in, so the two read alike. */
+.hunkLink[aria-current='true'] {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.hunkLink {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.jump:hover,
+.hunkLink:hover {
+  text-decoration: underline;
+}
+
+.subtitle {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hunks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Where the walk is standing. The same mark the contents list uses for the
+   change the reader is in, so the two read alike. */
+.hunkLink[aria-current='true'] {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.hunkLink {
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+}
+
+.issues {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.issue {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.issue:hover {
+  text-decoration: underline;
+}
+
+/* Narrowing Previous/Next to one intent. Set apart from the hunk list below
+   it, because it changes how the toolbar behaves rather than jumping
+   somewhere. */
+.focus {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.focusButton {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: default;
+}
+
+.focusButton:hover {
+  text-decoration: underline;
+}
+
+/* The contents list: every logical change in the diff, in the order they
+   appear. One row per change, each with its own badge so the list and the
+   gutter read as the same thing. */
+.contents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.entry {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.entryButton {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  text-align: left;
+  cursor: default;
+}
+
+.entryButton:hover {
+  background: var(--surface-hover);
+}
+
+/* Where the reader is now. A left edge in the change's own colour, rather
+   than a tick, so it reads as a position rather than as a selection. */
+.entryButton[aria-current='true'] {
+  border-color: var(--border-subtle);
+  background: var(--surface);
+}
+
+.entryLabel {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: var(--note-lane);
+  color: var(--note-badge-text);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.entryText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.entryMeta {
+  color: var(--text-faint);
+  font-size: calc(var(--ui-font-size) - 1px);
+}
+
+.entryFocus {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.entryFocus:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.entryFocusOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}

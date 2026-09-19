@@ -1,0 +1,31 @@
+/* Not an error: the diff is fine, the notes simply describe less of it than
+   they did. Amber rather than red, and the tooltip says what happened. */
+.warning {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--note-unexplained);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Read by screen readers, and by nothing else. */
+.detail {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
