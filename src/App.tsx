@@ -25,6 +25,7 @@ import { useAiChangelog } from './hooks/useAiChangelog.ts';
 import { useRepositoryDiff } from './hooks/useRepositoryDiff.ts';
 import { useRowMetrics } from './hooks/useRowMetrics.ts';
 import { useSettings } from './hooks/useSettings.ts';
+import { useZoom } from './hooks/useZoom.ts';
 import { autoWrapColumn, buildRowModel } from './lib/rows.ts';
 import {
   changeOfHunk,
@@ -93,6 +94,13 @@ export function App() {
   const metrics = useRowMetrics(hasNotes);
   const settingsState = useSettings();
   const { wrap, wrapLength } = settingsState.settings;
+
+  /**
+   * ⌘+ / ⌘− / ⌘0, and the View menu items alongside them. The webview's page
+   * zoom does the scaling, so nothing below has to know the interface is any
+   * particular size.
+   */
+  const zoom = useZoom(settingsState);
 
   /**
    * The layout this window is in, as against the one it opens with.
@@ -376,6 +384,9 @@ export function App() {
     onNextChange: changes.length === 0 ? undefined : goToNextChange,
     onPreviousChange: changes.length === 0 ? undefined : goToPreviousChange,
     onEscape: focused === null ? undefined : () => setFocused(null),
+    onZoomIn: zoom.zoomIn,
+    onZoomOut: zoom.zoomOut,
+    onZoomReset: zoom.resetZoom,
   });
 
   const handleLoadFully = useCallback(

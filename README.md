@@ -99,10 +99,11 @@ error — a preference is never worth an error screen in front of the diff.
 
 The rest of the macOS menu bar is Tauri's own default, which it installs when
 the builder is given no menu — that is where ⌘C, ⌘W, Hide and About already
-come from. Only the Settings item is ours, because a settings item is the one
-thing `PredefinedMenuItem` cannot supply: the OS knows what About and Quit do,
-but only the app knows what Settings opens. Other platforms get no menu from
-Tauri, so there the gear is the way in.
+come from. Only the Settings item and the three zoom items in View are ours,
+because those are what `PredefinedMenuItem` cannot supply: the OS knows what
+About and Quit do, but only the app knows what Settings opens or what the next
+zoom level is. Other platforms get no menu from Tauri, so there the gear is the
+way in and the zoom keys stand alone.
 
 The item follows macOS 13, which renamed Preferences to Settings; the dialog,
 the Rust module and `settings.json` all use the same word.
@@ -111,13 +112,21 @@ Deliberately small: `CLAUDE.md` puts complex preference screens out of scope.
 
 ## Keyboard
 
-| Key       | Action          |
-| --------- | --------------- |
-| `n` / `j` | Next change     |
-| `p` / `k` | Previous change |
+| Key         | Action              |
+| ----------- | ------------------- |
+| `n` / `j`   | Next change         |
+| `p` / `k`   | Previous change     |
+| `⌘+` / `⌘-` | Larger / smaller    |
+| `⌘0`        | Back to actual size |
 
 In the file list: type to filter, `↑` / `↓` to move, `Enter` to go, `Esc` to
 close.
+
+Zoom is `Ctrl` rather than `⌘` off macOS, and scales everything — the code, the
+chrome, the icons and the borders — because it is the webview's own page zoom
+rather than a font size. That also leaves the CSS pixel the row model is built
+on alone, so the renderer never learns it happened. The level is a setting, so
+a window opens at the size you left it.
 
 ## Architecture
 

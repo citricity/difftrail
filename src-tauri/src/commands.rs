@@ -25,6 +25,29 @@ fn settings_path<R: Runtime>(app: &tauri::AppHandle<R>) -> std::path::PathBuf {
     settings::file_path(&config_dir)
 }
 
+/// Scales the whole interface to a stored level.
+///
+/// Page zoom is a property of the webview rather than of the document, so it
+/// is the shell that applies it: the frontend chooses a level and never
+/// touches the scaling itself. A platform that will not zoom is not a reason
+/// to fail a save, so the error is reported and swallowed.
+fn apply_zoom<R: Runtime>(app: &tauri::AppHandle<R>, settings: Settings) {
+    let Some(webview) = app.get_webview_window("main") else {
+        return;
+    };
+
+    if let Err(err) = webview.set_zoom(settings::zoom_factor(settings.zoom)) {
+        eprintln!("[difftrek] could not set the zoom level: {err}");
+    }
+}
+
+/// Applies the stored zoom during setup, before the window is first shown, so
+/// that a scaled interface opens scaled rather than snapping to size a moment
+/// after it appears.
+pub fn apply_stored_zoom<R: Runtime>(app: &tauri::AppHandle<R>) {
+    apply_zoom(app, settings::load_from(&settings_path(app)));
+}
+
 /// Current preferences.
 ///
 /// Infallible by design: a missing or damaged file reads as the defaults, so
@@ -45,7 +68,14 @@ pub fn set_settings<R: Runtime>(
 ) -> AppResult<Settings> {
     let path = settings_path(&app);
     settings::save_to(&path, settings)?;
-    Ok(settings.sanitised())
+
+    // Storing the zoom is also applying it: the level and the size of what is
+    // on screen are the same fact, and letting the frontend set one without
+    // the other would let them drift.
+    let stored = settings.sanitised();
+    apply_zoom(&app, stored);
+
+    Ok(stored)
 }
 
 /// How the app was launched.

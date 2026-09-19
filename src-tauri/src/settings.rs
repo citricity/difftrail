@@ -21,6 +21,21 @@ const MIN_WRAP_LENGTH: u32 = 40;
 const MAX_WRAP_LENGTH: u32 = 1000;
 const DEFAULT_WRAP_LENGTH: u32 = 120;
 
+/// How far the whole interface is scaled, as a percentage of its natural size.
+///
+/// The webview's own page zoom does the scaling, so it reaches the chrome, the
+/// icons and the borders as well as the text. It also scales the CSS pixel
+/// itself, which is why the virtualiser needs to know nothing about it: a row
+/// is still `--row-height` pixels tall, there are simply more device pixels in
+/// one of them.
+///
+/// The bounds are the ends of the ladder the frontend steps through (see
+/// `lib/zoom.ts`), and clamping them here means a hand-edited file cannot open
+/// a window at a size from which nothing on screen can be read to undo it.
+const MIN_ZOOM: u32 = 50;
+const MAX_ZOOM: u32 = 300;
+const DEFAULT_ZOOM: u32 = 100;
+
 const FILE_NAME: &str = "settings.json";
 
 /// How a file's diff is laid out.
@@ -81,6 +96,21 @@ fn lenient_wrap_mode<'de, D: Deserializer<'de>>(de: D) -> Result<WrapMode, D::Er
     })
 }
 
+/// Reads the zoom level, treating anything that is not a number as unset.
+///
+/// The same reasoning as the two readers above: one unusable field must not
+/// discard every other preference in the file. A float is accepted and rounded
+/// because a hand-edited file may well hold one.
+fn lenient_zoom<'de, D: Deserializer<'de>>(de: D) -> Result<u32, D::Error> {
+    let raw = serde_json::Value::deserialize(de)?;
+    Ok(raw
+        .as_f64()
+        .filter(|value| value.is_finite())
+        // Saturating, so a negative or an absurd number lands on a bound
+        // rather than wrapping into a plausible-looking one.
+        .map_or(DEFAULT_ZOOM, |value| value.round() as u32))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -95,6 +125,17 @@ pub struct Settings {
     /// this is the starting point, not the current state.
     #[serde(default, deserialize_with = "lenient_view_mode")]
     pub default_view_mode: ViewMode,
+    /// How far the whole interface is scaled, as a percentage.
+    ///
+    /// Unlike the rest, this one is acted on by the shell rather than the
+    /// frontend: storing it is what applies it (see `commands::set_settings`),
+    /// because the level and the webview it scales are the same fact and
+    /// setting one without the other would let them drift.
+    // No field-level `default`: that would be `u32`'s zero, which the clamp
+    // would read as the smallest zoom there is. The container's `default`
+    // above answers for a missing field, and it answers `DEFAULT_ZOOM`.
+    #[serde(deserialize_with = "lenient_zoom")]
+    pub zoom: u32,
 }
 
 impl Default for Settings {
@@ -103,6 +144,7 @@ impl Default for Settings {
             wrap: WrapMode::Off,
             wrap_length: DEFAULT_WRAP_LENGTH,
             default_view_mode: ViewMode::Unified,
+            zoom: DEFAULT_ZOOM,
         }
     }
 }
@@ -114,8 +156,17 @@ impl Settings {
             wrap: self.wrap,
             wrap_length: self.wrap_length.clamp(MIN_WRAP_LENGTH, MAX_WRAP_LENGTH),
             default_view_mode: self.default_view_mode,
+            zoom: self.zoom.clamp(MIN_ZOOM, MAX_ZOOM),
         }
     }
+}
+
+/// The scale factor the webview takes, from a stored percentage.
+///
+/// Clamped again rather than trusting the caller: this is the last point
+/// before a number becomes the size of everything on screen.
+pub fn zoom_factor(zoom: u32) -> f64 {
+    f64::from(zoom.clamp(MIN_ZOOM, MAX_ZOOM)) / 100.0
 }
 
 pub fn file_path(config_dir: &Path) -> PathBuf {
@@ -187,6 +238,60 @@ mod tests {
         assert_eq!(settings.wrap, WrapMode::Off);
         assert_eq!(settings.wrap_length, 120);
         assert_eq!(settings.default_view_mode, ViewMode::Unified);
+        assert_eq!(settings.zoom, 100);
+    }
+
+    #[test]
+    fn the_zoom_round_trips() {
+        let path = temp_dir("zoom").join("settings.json");
+        let settings = Settings {
+            zoom: 125,
+            ..Settings::default()
+        };
+
+        save_to(&path, settings).unwrap();
+        assert_eq!(load_from(&path), settings);
+    }
+
+    #[test]
+    fn an_unreadable_zoom_costs_only_itself() {
+        let path = temp_dir("unknown-zoom").join("settings.json");
+        std::fs::write(&path, r#"{"zoom": "big", "wrapLength": 90}"#).unwrap();
+
+        let settings = load_from(&path);
+        assert_eq!(settings.zoom, 100);
+        assert_eq!(settings.wrap_length, 90);
+    }
+
+    #[test]
+    fn an_out_of_range_zoom_is_clamped_on_the_way_in_and_out() {
+        let path = temp_dir("clamp-zoom").join("settings.json");
+
+        std::fs::write(&path, r#"{"zoom": 10}"#).unwrap();
+        assert_eq!(load_from(&path).zoom, 50);
+
+        std::fs::write(&path, r#"{"zoom": -400}"#).unwrap();
+        assert_eq!(load_from(&path).zoom, 50);
+
+        save_to(
+            &path,
+            Settings {
+                zoom: 5_000,
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(load_from(&path).zoom, 300);
+    }
+
+    #[test]
+    fn the_zoom_factor_is_the_percentage_as_a_fraction() {
+        assert_eq!(zoom_factor(100), 1.0);
+        assert_eq!(zoom_factor(150), 1.5);
+        // Out of range on the way to the webview as well, not only on the way
+        // to disk: nothing downstream re-checks it.
+        assert_eq!(zoom_factor(0), 0.5);
+        assert_eq!(zoom_factor(10_000), 3.0);
     }
 
     #[test]
@@ -282,6 +387,9 @@ mod tests {
         let settings = load_from(&path);
         assert_eq!(settings.wrap, WrapMode::Column);
         assert_eq!(settings.wrap_length, 120);
+        // Not the smallest zoom: a missing field is the default, and the
+        // default is the natural size.
+        assert_eq!(settings.zoom, 100);
     }
 
     #[test]
